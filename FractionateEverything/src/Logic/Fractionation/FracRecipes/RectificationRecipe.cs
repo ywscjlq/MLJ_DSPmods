@@ -122,4 +122,8 @@ public class RectificationRecipe : BaseRecipe {
     }
 
     #endregion
+
+    public bool SupportsTuningTarget(int itemId) {
+        return itemId > 0;
+    }
 }

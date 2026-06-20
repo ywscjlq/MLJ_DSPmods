@@ -1,6 +1,7 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using BepInEx.Configuration;
+using FE.Logic.DarkFog;
 using FE.Logic.Economy;
 using FE.UI.Controls;
 using FE.UI.Foundation.Window;
@@ -41,13 +42,15 @@ public static class MarketBoard {
     private static readonly OfferRow[] rows = new OfferRow[RowCount];
 
     public static void AddTranslations() {
-        Register("市场板", "Limited Orders", "限时订单");
+        Register("市场板", "Market Board");
         Register("交易", "Trade");
         Register("订单刷新", "Order Refresh");
         Register("补给刷新", "Supply Refresh", "补给刷新");
+        Register("特单概览", "Special Orders", "特单概览");
         Register("补给概览", "Supply Overview", "补给概览");
         Register("短缺补给", "Shortage Supply", "短缺补给");
         Register("阶段矩阵补给", "Stage Matrix Supply", "阶段矩阵补给");
+        Register("黑雾补票", "Dark Fog Catch-up", "黑雾补票");
     }
 
     public static void LoadConfig(ConfigFile configFile) { }
@@ -70,7 +73,7 @@ public static class MarketBoard {
                         strong: true,
                         rows: [Px(24f), 1],
                         children: [
-                            CardTitleNode("补给概览", onBuilt: text => txtBoardTitle = text,
+                            CardTitleNode("特单概览", onBuilt: text => txtBoardTitle = text,
                                 pos: (0, 0), objectName: "market-board-summary-title"),
                             TextNode("", 13, onBuilt: text => txtSummary = text,
                                 pos: (1, 0), objectName: "market-board-summary"),
@@ -139,14 +142,24 @@ public static class MarketBoard {
             ticks = 0;
         }
         header.Title.text = "市场板".Translate().WithColor(Orange);
-        txtExpire.text = $"{"市场板".Translate()} / {"补给刷新".Translate()}：{FormatTicks(ticks)}";
+        txtExpire.text = $"{"补给刷新".Translate()}：{FormatTicks(ticks)}";
         txtBoardTitle.text = "补给概览".Translate().WithColor(Orange);
         int shortageCount = MarketBoardManager.ActiveOffers.Count(offer =>
             offer.OfferType == MarketBoardManager.MarketOfferType.SellToPlayer);
         int matrixCount = MarketBoardManager.ActiveOffers.Count(offer =>
             offer.OfferType == MarketBoardManager.MarketOfferType.StageSupply);
+        int darkFogSpecialCount = MarketBoardManager.ActiveOffers.Count(offer =>
+            offer.OfferType == MarketBoardManager.MarketOfferType.Special
+            && DarkFogCombatManager.IsDarkFogOffer(offer));
+        string stageName = DarkFogCombatManager.GetCurrentStage() switch {
+            EDarkFogCombatStage.Dormant => "休眠观察".WithColor(Orange),
+            EDarkFogCombatStage.Signal => "信号接触".WithColor(Blue),
+            EDarkFogCombatStage.GroundSuppression => "地面压制".WithColor(Green),
+            EDarkFogCombatStage.StellarHunt => "星域围猎".WithColor(Blue),
+            _ => "奇点收束".WithColor(Gold),
+        };
         txtSummary.text =
-            $"{"补给概览".Translate()}：{"短缺补给".Translate()} {shortageCount} 项    {"阶段矩阵补给".Translate()} {matrixCount} 项";
+            $"{FormatMarketLevel()}    {"补给概览".Translate()}：{"短缺补给".Translate()} {shortageCount} 项    {"阶段矩阵补给".Translate()} {matrixCount} 项    {"黑雾补票".Translate()} {darkFogSpecialCount} 项    阶段 {stageName}";
 
         var offers = MarketBoardManager.ActiveOffers;
         for (int i = 0; i < rows.Length; i++) {
@@ -165,6 +178,12 @@ public static class MarketBoard {
                 rows[i].TxtExtra.text = "";
             }
             SetItem(rows[i].OutputIcon, rows[i].TxtOutput, offer.OutputItemId, offer.OutputCount);
+            if (MarketBoardManager.IsDarkFogRecipeBackfillOffer(offer)) {
+                rows[i].TxtOutput.text = "配方补票";
+            } else if (DarkFogCombatManager.IsDarkFogOffer(offer)
+                       && !DarkFogCombatManager.IsEnhancedRewardItem(offer.OutputItemId)) {
+                rows[i].TxtOutput.text = "配方成长";
+            }
             string offerTag = GetOfferTag(offer);
             if (!string.IsNullOrEmpty(offerTag)) {
                 rows[i].TxtOutput.text = string.IsNullOrEmpty(rows[i].TxtOutput.text)
@@ -174,16 +193,40 @@ public static class MarketBoard {
             rows[i].BtnTrade.gameObject.SetActive(true);
             rows[i].BtnTrade.button.interactable = true;
         }
+
+        // === 市场走势图（IMGUI 在 uGUI 之上） ===
+        if (Event.current.type == EventType.Repaint)
+        {
+            MarketTrendRecorder.Tick();
+            var trendArea = new Rect(tab.rect.x + 20, tab.rect.y + tab.rect.height - 180,
+                tab.rect.width - 40, 170);
+            if (MarketTrendRecorder.HasData(MarketTrendRecorder.TrackedItems.Count > 0
+                ? MarketTrendRecorder.TrackedItems[0] : -1))
+            {
+                int[] ids = new int[MarketTrendRecorder.TrackedItems.Count];
+                for (int idx = 0; idx < ids.Length; idx++)
+                    ids[idx] = MarketTrendRecorder.TrackedItems[idx];
+                MarketTrendRenderer.Render(trendArea, ids, "market_trend");
+            }
+        }
     }
 
     private static string GetOfferTag(MarketBoardManager.MarketOffer offer) {
+        if (DarkFogCombatManager.IsEnhancedDarkFogOffer(offer)) {
+            return "[黑雾增强]".WithColor(Gold);
+        }
+        if (DarkFogCombatManager.IsDarkFogOffer(offer)) {
+            return $"[{"黑雾补票".Translate()}]".WithColor(Blue);
+        }
         if (offer.OfferType == MarketBoardManager.MarketOfferType.StageSupply) {
             return $"[{"阶段矩阵补给".Translate()}]".WithColor(Green);
         }
         if (offer.OfferType == MarketBoardManager.MarketOfferType.SellToPlayer) {
             return $"[{"短缺补给".Translate()}]".WithColor(Orange);
         }
-        return string.Empty;
+        return offer.OfferType == MarketBoardManager.MarketOfferType.Special
+            ? "[特单]".WithColor(Orange)
+            : string.Empty;
     }
 
     private static void SetItem(MyImageButton icon, Text text, int itemId, int count) {
@@ -214,5 +257,20 @@ public static class MarketBoard {
         int minutes = totalSeconds / 60;
         int seconds = totalSeconds % 60;
         return $"{minutes:00}:{seconds:00}";
+    }
+
+    private static string FormatMarketLevel() {
+        int lv = MarketLevelManager.Level;
+        int quota = MarketLevelManager.GetQuota(0); // 通用配额
+        float spread = MarketLevelManager.GetSpread() * 100f;
+        string heat = "";
+        int h = MarketLevelManager.HeatBonus;
+        for (int i = 0; i < Mathf.Min(h/3, 5); i++) heat += "🔥";
+        string evt = MarketLevelManager.CurrentEvent;
+        string style = MarketLevelManager.PersonalityStyle;
+        string result = $"🌐 Lv.{lv} 配额:{quota} 价差:{spread:F1}%{heat} [{style}]";
+        if (!string.IsNullOrEmpty(evt))
+            result += $"  ⚡{evt}";
+        return result;
     }
 }

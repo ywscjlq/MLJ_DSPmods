@@ -57,7 +57,7 @@ public static class MarketValueManager {
             return;
         }
 
-        if (GameMain.gameTick - LastRefreshTick < RefreshIntervalTicks) {
+        if (GameMain.gameTick - LastRefreshTick < (long)(MarketLevelManager.GetRefreshIntervalSeconds() * 60f)) {
             return;
         }
 
@@ -92,7 +92,7 @@ public static class MarketValueManager {
             if (force) {
                 MarketMultiplier[itemId] = targetMultiplier;
             } else {
-                float blended = MarketMultiplier[itemId] * 0.75f + targetMultiplier * 0.25f;
+                float blended = MarketMultiplier[itemId] * 0.60f + targetMultiplier * 0.40f;  // R5: 加速响应 75/25→60/40;
                 MarketMultiplier[itemId] = ClampMultiplier(itemId, blended);
             }
             MarketValue[itemId] = baseValue * MarketMultiplier[itemId];
@@ -121,16 +121,17 @@ public static class MarketValueManager {
     /// 返回距离下一次市场刷新还剩多少 tick，用于 UI 倒计时显示。
     /// </summary>
     public static long GetRefreshRemainingTicks() {
+        long intervalTicks = (long)(MarketLevelManager.GetRefreshIntervalSeconds() * 60f);
         if (!initialized) {
-            return RefreshIntervalTicks;
+            return intervalTicks;
         }
 
         long elapsedTicks = GameMain.gameTick - LastRefreshTick;
         if (elapsedTicks <= 0L) {
-            return RefreshIntervalTicks;
+            return intervalTicks;
         }
 
-        return Math.Max(0L, RefreshIntervalTicks - elapsedTicks);
+        return Math.Max(0L, intervalTicks - elapsedTicks);
     }
 
     public static int GetRefreshRemainingSeconds() {
@@ -197,8 +198,7 @@ public static class MarketValueManager {
                && LDB.items.Exist(itemId)
                && GetBaseValue(itemId) > 0f
                && GetBaseValue(itemId) < maxValue
-               && !IsRectificationChainItem(itemId)
-               && !IsSourcePointItem(itemId)
+               && itemId != IFE残片
                && itemId != I沙土;
     }
 

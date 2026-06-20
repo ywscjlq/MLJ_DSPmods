@@ -37,7 +37,7 @@ namespace FE.Compatibility;
 [BepInDependency(OrbitalRing.GUID, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(PackageLogistic.GUID, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(SmelterMiner.GUID, BepInDependency.DependencyFlags.SoftDependency)]
-[BepInDependency(TheyComeFromVoid.GUID, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency("com.ckcz123.DSP_Battle", BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(UxAssist.GUID, BepInDependency.DependencyFlags.SoftDependency)]
 public class CheckPlugins : BaseUnityPlugin {
     public const string GUID = PluginInfo.PLUGIN_GUID + ".CheckPlugins";
@@ -163,7 +163,7 @@ public class CheckPlugins : BaseUnityPlugin {
         OrbitalRing.Compatible();
         PackageLogistic.Compatible();
         SmelterMiner.Compatible();
-        TheyComeFromVoid.Compatible();
+            // TheyComeFromVoid.Compatible();  // TheyComeFromVoid excluded
         UxAssist.Compatible();
 
         new Harmony(GUID).Patch(

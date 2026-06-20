@@ -68,7 +68,12 @@ public static class ItemCountRedirectPatch {
         if (storage != GameMain.mainPlayer?.package) {
             return storage.GetItemCount(itemId);
         }
-        ItemProto item = LDB.items.Select(itemId);
+        ItemProto item = null;
+        try {
+            item = LDB.items.Select(itemId);
+        } catch {
+            return 0;
+        }
         if (item == null) {
             return 0;
         }

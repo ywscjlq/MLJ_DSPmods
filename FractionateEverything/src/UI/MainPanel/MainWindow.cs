@@ -51,7 +51,6 @@ public static class MainWindow {
         Register("切换到旧版主面板", "Switch to legacy main panel");
         Register("生产管理", "Production Management");
         FracRecipeOperate.AddTranslations();
-        GlobalGrowthOperate.AddTranslations();
         VanillaRecipeOperate.AddTranslations();
         BuildingOperate.AddTranslations();
         Register("资源管理", "Resource Management");
@@ -67,7 +66,9 @@ public static class MainWindow {
         LimitedTimeStore.AddTranslations();
         TicketExchange.AddTranslations();
         Register("任务成就", "Tasks & Achievements");
+        DarkFogTasks.LoadConfig(null); // 存根
         MainTask.AddTranslations();
+        RecurringTask.AddTranslations();
         Achievements.AddTranslations();
         DevelopmentDiary.AddTranslations();
         Register("图鉴档案", "Gallery & Archive");
@@ -76,11 +77,12 @@ public static class MainWindow {
         Register("系统设置", "System Setting");
         Miscellaneous.AddTranslations();
         SandboxMode.AddTranslations();
+        DashboardPage.AddTranslations();
+        AutoReplenishPage.AddTranslations();
     }
 
     public static void LoadConfig(ConfigFile configFile) {
         FracRecipeOperate.LoadConfig(configFile);
-        GlobalGrowthOperate.LoadConfig(configFile);
         VanillaRecipeOperate.LoadConfig(configFile);
         BuildingOperate.LoadConfig(configFile);
 
@@ -95,6 +97,8 @@ public static class MainWindow {
         TicketExchange.LoadConfig(configFile);
 
         MainTask.LoadConfig(configFile);
+        RecurringTask.LoadConfig(configFile);
+        DarkFogTasks.LoadConfig(configFile);
         Achievements.LoadConfig(configFile);
         DevelopmentDiary.LoadConfig(configFile);
 
@@ -103,6 +107,7 @@ public static class MainWindow {
 
         Miscellaneous.LoadConfig(configFile);
         SandboxMode.LoadConfig(configFile);
+        DashboardPage.LoadConfig(configFile);
     }
 
     public static void Init() {
@@ -177,6 +182,7 @@ public static class MainWindow {
             return;
         }
 
+        RecurringTask.TickAutoClaim();
         Achievements.TickAutoUnlock();
 
         if (_toggleKey.keyValue) {
@@ -505,6 +511,7 @@ public static class MainWindow {
             ("LimitedTimeStore", LimitedTimeStore.Import),
             ("TicketExchange", TicketExchange.Import),
             ("MainTask", MainTask.Import),
+            ("RecurringTask", RecurringTask.Import),
             ("Achievements", Achievements.Import),
             ("DevelopmentDiary", DevelopmentDiary.Import),
             ("RecipeGallery", RecipeGallery.Import),
@@ -525,6 +532,7 @@ public static class MainWindow {
             ("LimitedTimeStore", LimitedTimeStore.Export),
             ("TicketExchange", TicketExchange.Export),
             ("MainTask", MainTask.Export),
+            ("RecurringTask", RecurringTask.Export),
             ("Achievements", Achievements.Export),
             ("DevelopmentDiary", DevelopmentDiary.Export),
             ("RecipeGallery", RecipeGallery.Export),
@@ -547,6 +555,7 @@ public static class MainWindow {
         TicketExchange.IntoOtherSave();
 
         MainTask.IntoOtherSave();
+        RecurringTask.IntoOtherSave();
         Achievements.IntoOtherSave();
         DevelopmentDiary.IntoOtherSave();
 

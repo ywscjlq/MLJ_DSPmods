@@ -39,7 +39,7 @@ public static class FracStatistic {
     private static readonly Text[] stockLines = new Text[6];
     private static readonly Text[] economyLines = new Text[6];
     private static readonly int[] trackedBuildingIds = [
-        IFE交互塔, IFE矿物复制塔, IFE转化塔, IFE精馏塔, IFE行星内物流交互站
+        IFE交互塔, IFE矿物复制塔, IFE点数聚集塔, IFE转化塔, IFE精馏塔, IFE行星内物流交互站
     ];
 
     public static void AddTranslations() {
@@ -59,10 +59,10 @@ public static class FracStatistic {
         Register("统计-资源库存", "Resource Stock", "资源库存");
         Register("统计-动态经济", "Dynamic Economy", "动态经济");
         Register("统计-残片余额", "Fragment Stock", "残片余额");
-        Register("统计-成长积分", "Growth Points", "成长积分");
+        Register("统计-成长池积分", "Growth Points", "成长池积分");
         Register("统计-市场下次刷新", "Market Refresh", "市场下次刷新");
         Register("统计-市场热度", "Market Heat", "市场热度");
-        Register("统计-市场指数概览", "Market Index Overview", "市场指数概览");
+        Register("统计-交易所概览", "Exchange Overview", "交易所概览");
         Register("统计-页头摘要", "Growth, stock and economy overview", "成长、库存与动态经济总览");
     }
 
@@ -134,7 +134,7 @@ public static class FracStatistic {
         summaryLines[6].text = $"{"统计-当前阶段矩阵".Translate()}：{currentMatrixName}  (阶段 {currentStageIndex + 1})";
 
         stockLines[0].text = $"{"统计-残片余额".Translate()}：{GetItemTotalCount(IFE残片)}";
-        stockLines[1].text = $"{"统计-成长积分".Translate()}：{GachaManager.GetPoolPoints(GachaPool.PoolIdGrowth)}";
+        stockLines[1].text = $"{"统计-成长池积分".Translate()}：{GachaManager.GetPoolPoints(GachaPool.PoolIdGrowth)}";
         stockLines[2].text = $"{"统计-当前阶段矩阵".Translate()}：{currentMatrixName} x{GetItemTotalCount(currentMatrixId)}";
         stockLines[3].text = $"{"统计-黑雾矩阵库存".Translate()}：{GetItemTotalCount(I黑雾矩阵)}";
         stockLines[4].text = $"{"统计-原胚库存".Translate()}：{GetProtoSummary()}";
@@ -160,7 +160,7 @@ public static class FracStatistic {
         };
         for (int i = 0; i < lines.Length; i++) {
             int index = i;
-            nodes.Add(TextNode("", 13, anchor: TextAnchor.MiddleLeft, wrap: true, onBuilt: text => lines[index] = text,
+            nodes.Add(TextNode("", 13, onBuilt: text => lines[index] = text,
                 pos: (index + 1, 0), objectName: $"{keyPrefix}{index}"));
         }
 
@@ -185,10 +185,10 @@ public static class FracStatistic {
                 continue;
             }
             if (BuildingGrowthService.NeedsBreakthrough(buildingId)) {
-                (int essenceId, int essenceCount, int fragmentCount) = BuildingGrowthService.GetBreakthroughCost(level);
-                string essenceName = LDB.items.Select(essenceId)?.name ?? essenceId.ToString();
+                (int matrixId, int matrixCount, int fragmentCount) = BuildingGrowthService.GetBreakthroughCost(level);
+                string matrixName = LDB.items.Select(matrixId)?.name ?? matrixId.ToString();
                 growthLines[i].text =
-                    $"{building.name}  Lv{level}  突破：{essenceName} x{essenceCount} + 残片 x{fragmentCount}"
+                    $"{building.name}  Lv{level}  突破：{matrixName} x{matrixCount} + 残片 x{fragmentCount}"
                         .WithColor(Orange);
                 continue;
             }
@@ -204,7 +204,7 @@ public static class FracStatistic {
         ExchangeManager.ExchangeTicker hotTicker = ExchangeManager.ListedItems
             .Select(ExchangeManager.GetTicker)
             .Where(ticker => ticker != null)
-            .OrderByDescending(ticker => GetVolumeMagnitude(ticker.NetMarketVolume))
+            .OrderByDescending(ticker => Mathf.Abs(ticker.NetPlayerVolume))
             .ThenByDescending(ticker => ticker.LastTradeTick)
             .FirstOrDefault();
 
@@ -213,27 +213,24 @@ public static class FracStatistic {
         economyLines[1].text = $"{"统计-市场热度".Translate()}：最热 {FormatMarketItem(hotItemId)}";
         economyLines[2].text = $"{"统计-市场热度".Translate()}：最冷 {FormatMarketItem(coldItemId)}";
         economyLines[3].text =
-            $"{"统计-市场指数概览".Translate()}：上市 {ExchangeManager.ListedItems.Count} 项 / 订单 {MarketBoardManager.ActiveOffers.Count} 条";
+            $"{"统计-交易所概览".Translate()}：上市 {ExchangeManager.ListedItems.Count} 项 / 订单 {MarketBoardManager.ActiveOffers.Count} 条";
         economyLines[4].text = hotTicker == null
-            ? $"{"统计-市场指数概览".Translate()}：暂无活跃指数"
-            : $"{"统计-市场指数概览".Translate()}：{LDB.items.Select(hotTicker.ItemId)?.name} 现价 {hotTicker.LastPrice:F2}  净流量 {hotTicker.NetMarketVolume}";
+            ? $"{"统计-交易所概览".Translate()}：暂无活跃成交"
+            : $"{"统计-交易所概览".Translate()}：{LDB.items.Select(hotTicker.ItemId)?.name} 现价 {hotTicker.LastPrice:F1}  净量 {hotTicker.NetPlayerVolume}";
         economyLines[5].text =
             $"{"统计-当前阶段矩阵".Translate()}：生产 {MarketValueManager.GetCurrentProductionRate(ItemManager.GetCurrentProgressMatrixId()):F1}/m  消耗 {MarketValueManager.GetCurrentConsumeRate(ItemManager.GetCurrentProgressMatrixId()):F1}/m";
-    }
-
-    private static int GetVolumeMagnitude(int volume) {
-        return volume == int.MinValue ? int.MaxValue : Mathf.Abs(volume);
     }
 
     private static string GetProtoSummary() {
         long interaction = GetItemTotalCount(IFE交互塔原胚);
         long mineral = GetItemTotalCount(IFE矿物复制塔原胚);
+        long point = GetItemTotalCount(IFE点数聚集塔原胚);
         long conversion = GetItemTotalCount(IFE转化塔原胚);
         long rectification = GetItemTotalCount(IFE精馏塔原胚);
         long directed = GetItemTotalCount(IFE分馏塔定向原胚);
-        long total = interaction + mineral + conversion + rectification + directed;
+        long total = interaction + mineral + point + conversion + rectification + directed;
         return
-            $"{total}\n交互 {interaction} / 复制 {mineral} / 转化 {conversion} / 精馏 {rectification} / 定向 {directed}";
+            $"{total}  (交互 {interaction} / 复制 {mineral} / 聚集 {point} / 转化 {conversion} / 精馏 {rectification} / 定向 {directed})";
     }
 
     private static long GetBuildingExpTotal() {

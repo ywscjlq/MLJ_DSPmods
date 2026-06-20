@@ -1,7 +1,10 @@
-﻿using System.IO;
+using System.IO;
+using FE.Logic;
 using FE.Logic.Buildings;
 using FE.Logic.DarkFog;
 using FE.Logic.Economy;
+using FE.Logic.Fractionation;
+using FE.Logic.Fractionation.Affix;
 using FE.Logic.Fractionation.Growth;
 using FE.Logic.Fractionation.Process;
 using FE.Logic.Fractionation.FracRecipes;
@@ -15,25 +18,23 @@ using static FE.Utils.Utils;
 
 namespace FE.Lifecycle;
 
-/// <summary>
-/// FE 功能域存档块注册表，集中维护保存、读取和切档清理顺序。
-/// </summary>
 public static class FeatureSaveRegistry {
     public static void Import(BinaryReader r) {
         r.ReadBlocks(
             ("Recipe", RecipeManager.Import),
             ("VanillaRecipes", VanillaRecipeManager.Import),
             ("RecipeGrowth", RecipeGrowthManager.Import),
-            ("Stacking", StackingManager.Import),
             ("Building", BuildingManager.Import),
             ("Item", DataCenterInventory.Import),
             ("Process", ProcessManager.Import),
             ("Gacha", GachaManager.Import),
             ("Economy", EconomyManager.Import),
             ("UI", MainWindow.Import),
-            ("Station", StationManager.Import)
+            ("Station", StationManager.Import),
+            ("EasterEgg", EasterEggManager.Import),
+            ("DailyDigest", DailyDigest.Import),
+            ("ChaosAbyss", ChaosAbyss.Import)
         );
-        VanillaRecipeManager.SyncRuntimeStateAfterImport();
         TechManager.RequestLoadTimeRecipeBaselineApply();
         TechManager.TryApplyLoadTimeRecipeBaselines();
     }
@@ -43,14 +44,16 @@ public static class FeatureSaveRegistry {
             ("Recipe", RecipeManager.Export),
             ("VanillaRecipes", VanillaRecipeManager.Export),
             ("RecipeGrowth", RecipeGrowthManager.Export),
-            ("Stacking", StackingManager.Export),
             ("Building", BuildingManager.Export),
             ("Item", DataCenterInventory.Export),
             ("Process", ProcessManager.Export),
             ("Gacha", GachaManager.Export),
             ("Economy", EconomyManager.Export),
             ("UI", MainWindow.Export),
-            ("Station", StationManager.Export)
+            ("Station", StationManager.Export),
+            ("EasterEgg", EasterEggManager.Export),
+            ("DailyDigest", DailyDigest.Export),
+            ("ChaosAbyss", ChaosAbyss.Export)
         );
     }
 
@@ -58,7 +61,6 @@ public static class FeatureSaveRegistry {
         RecipeManager.IntoOtherSave();
         VanillaRecipeManager.IntoOtherSave();
         RecipeGrowthManager.IntoOtherSave();
-        StackingManager.IntoOtherSave();
         BuildingManager.IntoOtherSave();
         DataCenterInventory.IntoOtherSave();
         ProcessManager.IntoOtherSave();
@@ -67,7 +69,9 @@ public static class FeatureSaveRegistry {
         DarkFogCombatManager.IntoOtherSave();
         MainWindow.IntoOtherSave();
         StationManager.IntoOtherSave();
-
+        EasterEggManager.IntoOtherSave();
+        DailyDigest.IntoOtherSave();
+        ChaosAbyss.IntoOtherSave();
         TechManager.ResetTechUnlockFlags();
     }
 }

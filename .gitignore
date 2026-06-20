@@ -377,3 +377,9 @@ DefaultPath.props
 .sisyphus/
 .codex/
 .claude/
+
+# Backups created by AI agent
+*.bak*
+
+# Backups created by AI agent
+*.bak*

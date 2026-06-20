@@ -65,8 +65,8 @@ public static class FracRecipeOperate {
 
     // 产物行布局（格式：概率 | 图标 | 数量）
     private const float ProductRatioX = 0f;// 左侧概率文本X
-    private const float ProductIconX = 88f;// 物品图标X（概率文本右侧）
-    private const float ProductTextX = 120f;// 名称×数目文本X（= ProductIconX + TextOffsetWithIcon）
+    private const float ProductIconX = 72f;// 物品图标X（概率文本右侧）
+    private const float ProductTextX = 100f;// 名称×数目文本X（= ProductIconX + TextOffsetWithIcon）
 
     // ==================== UI 元素 ====================
 
@@ -97,16 +97,6 @@ public static class FracRecipeOperate {
         Register("产出", "Output");
         Register("随机", "Random");
         Register("单锁", "Single Lock");
-        Register("随机简称", "R", "随");
-        Register("单锁简称", "L", "锁");
-        Register("增产点数", "Proliferator points");
-        Register("矩阵萃取", "Matrix extraction");
-        Register("精华调相", "Essence tuning");
-        Register("萃取损耗", "Extraction loss");
-        Register("压缩倍率", "Compression");
-        Register("回流倍率", "Reflux");
-        Register("精馏配方不参与成功率加成；矩阵萃取保留损毁，精华调相损毁为0。",
-            "Rectification recipes do not use success-rate bonuses. Matrix extraction keeps destroy chance; essence tuning has no destroy chance.");
 
         Register("配方已完全升级！", "Recipe has been completely upgraded!");
         Register("每个原料平均产出：", "Average output per raw material:");
@@ -118,13 +108,12 @@ public static class FracRecipeOperate {
         Register("增产效率", "Proliferator Efficiency");
         Register("流体增强", "Fluid Enhancement");
         Register("成功率加成", "Success Boost");
-        Register("上秒献祭", "Last sacrificed");
         Register("已启用", "Enabled");
         Register("未启用", "Disabled");
         Register("牺牲特性", "Sacrifice Trait");
         Register("因果追踪", "Causal Tracing");
         Register("虚空喷射", "Void Spray");
-        Register("虚空聚集", "Void Aggregation");
+        Register("双倍点数", "Double Points");
         Register("最大增产等级", "Max Inc Level");
 
         // 右列：等级信息
@@ -137,29 +126,24 @@ public static class FracRecipeOperate {
         Register("解锁方式", "Unlock Method");
         Register("升级方式", "Upgrade Method");
         Register("成长进度", "Growth Progress");
-        Register("抽取单位回响", "Draw Unit Resonance");
-        Register("通过主抽取开线偏好获取", "Obtain from Main Draw route preference", "通过主抽取路线偏好获取");
-        Register("通过主抽取开线偏好获取；部分前期配方也会随科技保底解锁",
-            "Obtain from Main Draw route preference; some early recipes are also unlocked by tech baseline",
-            "通过主抽取路线偏好获取；部分前期配方也会随科技保底解锁");
-        Register("通过主抽取原胚偏好或成长规划获得；相关科技也会保底解锁",
-            "Obtain from Main Draw proto preference or Growth Planning; related tech also provides baseline unlock");
+        Register("通过开线抽取获取", "Obtain from Opening Pool");
+        Register("通过开线抽取获取；部分前期配方也会随科技保底解锁",
+            "Obtain from Opening Pool; some early recipes are also unlocked by tech baseline");
+        Register("通过原胚闭环或成长规划获得；相关科技也会保底解锁",
+            "Obtain from Proto Loop or Growth Planning; related tech also provides baseline unlock");
         Register("通过成长规划或固定入口获得；解锁后直接满级",
             "Obtain from Growth Planning or fixed entry; unlocking grants max level directly");
         Register("通过黑雾支线成长规划报价获得",
             "Obtain from Dark Fog branch Growth Planning offers");
         Register("通过科技保底解锁", "Unlocked by tech baseline");
         Register("首次获得对应黑雾物品后解锁", "Unlock after obtaining the related Dark Fog item once");
-        Register("运行对应配方获取经验，重复获得时补充成长进度",
-            "Gain EXP by running the matching recipe; duplicate rewards add growth progress");
+        Register("重复抽到该配方即可升级", "Upgrade by drawing the same recipe again");
         Register("处理对应原胚获取经验，重复获得时也会直接提升",
             "Gain EXP by processing matching proto; duplicate rewards also level it up");
         Register("处理对应原胚获取经验", "Gain EXP by processing the matching proto");
         Register("处理对应黑雾物品获取经验，也可通过成长规划补差",
             "Gain EXP by processing the matching Dark Fog item, or catch up through Growth Planning");
         Register("处理对应矩阵获取保底进度", "Build pity progress by processing matching matrices");
-        Register("处理对应矩阵或矩阵精华获取保底进度，也可通过矩阵精华催化补差",
-            "Build pity progress by processing matching matrices or matrix essences; matrix essences can also catalyse catch-up");
         Register("解锁后", "After unlocking");
         Register("直接满级", "be granted at max level immediately");
         Register("已完全升级，无需继续成长", "Fully upgraded; no further growth needed");
@@ -211,7 +195,7 @@ public static class FracRecipeOperate {
                         strong: true,
                         onBuilt: root => tab = root,
                         rows: BuildContentRows(),
-                        cols: [Fr(5), Fr(4)],
+                        cols: [Px(600f), Fr(1)],
                         rowGap: 0f,
                         columnGap: 20f,
                         children: [
@@ -286,7 +270,7 @@ public static class FracRecipeOperate {
         for (int i = 0; i < InfoLineCount; i++) {
             int index = i;
             int row = i + 2;
-            nodes.Add(Grid(pos: (row, 0), cols: [Px(88f), Px(24f), Px(24f), Fr(1)], children: [
+            nodes.Add(Grid(pos: (row, 0), cols: [Px(72f), Px(24f), Px(24f), Fr(1)], children: [
                 TextNode("", 15, onBuilt: text => {
                         txtRecipeInfo[index] = text;
                         text.rectTransform.sizeDelta = new Vector2(560f, LineHeight);
@@ -349,22 +333,13 @@ public static class FracRecipeOperate {
             ShowTextLine(line++, headerName.WithColor(recipe.MatrixID - I电磁矩阵));
             ShowTextLine(line++, "");// 空行
 
-            if (recipe is RectificationRecipe rectificationHeaderRecipe) {
-                string kindText = rectificationHeaderRecipe.Kind
-                                  == RectificationRecipe.RectificationRecipeKind.MatrixExtraction
-                    ? "矩阵萃取".Translate()
-                    : "精华调相".Translate();
+            if (recipe is RectificationRecipe) {
                 ShowTextLine(line++,
-                    $"{"成功率".Translate()} {1.0f:P3}（{kindText}）".WithColor(Orange));
+                    $"{"成功率".Translate()} {1.0f:P3}（稳定压缩）".WithColor(Orange));
                 ShowTextLine(line++,
-                    "精馏配方不参与成功率加成；矩阵萃取保留损毁，精华调相损毁为0。".Translate()
-                        .WithColor(Gray));
-                string destroyColorText = rectificationHeaderRecipe.DestroyRatio <= 0f
-                    ? $"{"损毁率".Translate()} {0.0f:P3}"
-                    : $"{"损毁率".Translate()} {rectificationHeaderRecipe.DestroyRatio:P3}";
-                ShowTextLine(line++, destroyColorText.WithColor(rectificationHeaderRecipe.DestroyRatio <= 0f
-                    ? Green
-                    : Red));
+                    "精馏塔不参与成功率判定，献祭/成就成功率加成不会改变残片结算。".WithColor(Gray));
+                ShowTextLine(line++,
+                    $"{"损毁率".Translate()} {0.0f:P3}（稳定压缩）".WithColor(Green));
             } else {
                 float sacrificeBoost = building?.SuccessBoost() ?? 0f;
                 float progressBoost = Achievements.GetSuccessRateBonus();
@@ -378,6 +353,7 @@ public static class FracRecipeOperate {
                     $"(献祭 +{sacrificeBoost:P2} / 成就 +{progressBoost:P2})"
                         .WithColor(Gray));
 
+                // 损毁率
                 float baseDestroyRatio = snapshot.DestroyRatio
                                          + GachaGalleryBonusManager.GetDestroyReduction(recipe.RecipeType);
                 float destroyReduction = GachaGalleryBonusManager.GetDestroyReduction(recipe.RecipeType);
@@ -428,18 +404,17 @@ public static class FracRecipeOperate {
 
             // 建筑强化效果
             if (building != null) {
-                ShowTextLine(line++, "建筑强化加成".Translate().WithColor(Orange));
-                ShowIconLine(line++, building, $"{building.name}  {"等级".Translate()} +{building.Level()}");
+                ShowIconLine(line++, building,
+                    $"{"建筑强化加成".Translate()} {building.name}  {"等级".Translate()} +{building.Level()}");
 
-                ShowTextLine(line++, $"{"堆叠".Translate()} x{building.MaxStack()}");
-                ShowTextLine(line++, $"{"能耗比".Translate()} {building.EnergyRatio():P0}");
-
-                ShowTextLine(line++, $"{"增产效率".Translate()} x{building.PlrRatio():F1}");
+                ShowTextLine(line++,
+                    $"{"堆叠".Translate()} x{building.MaxStack()}  "
+                    + $"{"能耗比".Translate()} {building.EnergyRatio():P0}  "
+                    + $"{"增产效率".Translate()} x{building.PlrRatio():F1}");
 
                 float sBoost = building.SuccessBoost();
-                long sacrificeCount = ProcessManager.GetSacrificedTowerCount(building.ID);
                 ShowTextLine(line++,
-                    $"{"成功率加成".Translate()} +{sBoost:P1}  {"上秒献祭".Translate()} {sacrificeCount}"
+                    $"{"成功率加成".Translate()} +{sBoost:P1}"
                         .WithColor(sBoost > 0 ? Orange : Gray));
 
                 bool fluidEnh = building.EnableFluidEnhancement();
@@ -551,11 +526,6 @@ public static class FracRecipeOperate {
             SetRightInfoLine(infoLineIdx++, $"{"升级方式".Translate()}：{"已完全升级，无需继续成长".Translate()}".WithColor(Green));
         }
 
-        string resonanceHint = BuildDrawUnitResonanceHint(recipe, snapshot);
-        if (!string.IsNullOrEmpty(resonanceHint)) {
-            SetRightInfoLine(infoLineIdx++, resonanceHint.WithColor(Purple));
-        }
-
         for (; infoLineIdx < LevelLineCount; infoLineIdx++) {
             txtLevelInfo[infoLineIdx].text = "";
         }
@@ -579,20 +549,20 @@ public static class FracRecipeOperate {
         RecipeGrowthRule rule = RecipeGrowthRules.GetRule(recipe);
         return rule.Family switch {
             RecipeFamily.MineralCopyNormal when rule.TechBaselineLevel > 0
-                => "通过主抽取开线偏好获取；部分前期配方也会随科技保底解锁".Translate(),
-            RecipeFamily.MineralCopyNormal or RecipeFamily.ConversionItemChain
-                => "通过主抽取开线偏好获取".Translate(),
+                => "通过开线抽取获取；部分前期配方也会随科技保底解锁".Translate(),
+            RecipeFamily.MineralCopyNormal or RecipeFamily.ConversionMaterialNormal
+                => "通过开线抽取获取".Translate(),
             RecipeFamily.BuildingTrainForward or RecipeFamily.BuildingTrainReverse
-                => "通过主抽取原胚偏好或成长规划获得；相关科技也会保底解锁".Translate(),
-            RecipeFamily.MineralCopyDarkFog or RecipeFamily.ConversionDarkFogChain
+                => "通过原胚闭环或成长规划获得；相关科技也会保底解锁".Translate(),
+            RecipeFamily.MineralCopyDarkFog or RecipeFamily.ConversionMaterialDarkFog
                 => "首次获得对应黑雾物品后解锁".Translate(),
             _ when recipe.RecipeType == ERecipe.Conversion && recipe.MatrixID == I黑雾矩阵
                 => "通过黑雾支线成长规划报价获得".Translate(),
-            RecipeFamily.ConversionBuilding
+            RecipeFamily.ConversionBuilding or RecipeFamily.PointAggregate
                 => "通过成长规划或固定入口获得；解锁后直接满级".Translate(),
             RecipeFamily.Rectification
                 => "通过科技保底解锁".Translate(),
-            _ => "通过主抽取开线偏好获取".Translate(),
+            _ => "通过开线抽取获取".Translate(),
         };
     }
 
@@ -603,17 +573,17 @@ public static class FracRecipeOperate {
         RecipeGrowthRule rule = RecipeGrowthRules.GetRule(recipe);
         string prefix = snapshot.IsUnlocked ? string.Empty : $"{"解锁后".Translate()}";
         return rule.Family switch {
-            RecipeFamily.MineralCopyNormal or RecipeFamily.ConversionItemChain
-                => prefix + "运行对应配方获取经验，重复获得时补充成长进度".Translate(),
+            RecipeFamily.MineralCopyNormal or RecipeFamily.ConversionMaterialNormal
+                => prefix + "重复抽到该配方即可升级".Translate(),
             RecipeFamily.BuildingTrainForward
                 => prefix + "处理对应原胚获取经验，重复获得时也会直接提升".Translate(),
             RecipeFamily.BuildingTrainReverse
                 => prefix + "处理对应原胚获取经验".Translate(),
-            RecipeFamily.MineralCopyDarkFog or RecipeFamily.ConversionDarkFogChain
+            RecipeFamily.MineralCopyDarkFog or RecipeFamily.ConversionMaterialDarkFog
                 => prefix + "处理对应黑雾物品获取经验，也可通过成长规划补差".Translate(),
             RecipeFamily.Rectification
-                => prefix + "处理对应矩阵或矩阵精华获取保底进度，也可通过矩阵精华催化补差".Translate(),
-            RecipeFamily.ConversionBuilding
+                => prefix + "处理对应矩阵获取保底进度".Translate(),
+            RecipeFamily.ConversionBuilding or RecipeFamily.PointAggregate
                 => snapshot.IsUnlocked
                     ? "已完全升级，无需继续成长".Translate()
                     : prefix + "直接满级".Translate(),
@@ -644,28 +614,6 @@ public static class FracRecipeOperate {
         }
 
         return string.Empty;
-    }
-
-    private static string BuildDrawUnitResonanceHint(BaseRecipe recipe, RecipeDisplaySnapshot snapshot) {
-        if (!snapshot.IsUnlocked || !IsDrawUnitRecipe(recipe)) {
-            return string.Empty;
-        }
-
-        int resonance = GachaService.GetRecipeDrawUnitResonance(recipe);
-        return $"{"抽取单位回响".Translate()}：Lv{resonance}/{GachaManager.MaxDrawUnitResonance}";
-    }
-
-    private static bool IsDrawUnitRecipe(BaseRecipe recipe) {
-        if (recipe == null) {
-            return false;
-        }
-
-        RecipeFamily family = RecipeGrowthRules.GetFamily(recipe);
-        return family is RecipeFamily.BuildingTrainForward
-            or RecipeFamily.BuildingTrainReverse
-            or RecipeFamily.MineralCopyNormal
-            or RecipeFamily.ConversionItemChain
-            or RecipeFamily.Rectification;
     }
 
     private static float GetBaseDestroyRatio(BaseRecipe recipe, int? level = null) => 0.04f;
@@ -714,14 +662,15 @@ public static class FracRecipeOperate {
         btnRecipeInfoIcons[line].Proto = itemProto;
         NormalizeRectWithMidLeft(btnRecipeInfoIcons[line], ProductIconX, 0f);
 
-        txtRecipeInfo[line].text = $"{ShortRandomLabel()}×{randomCount}  {ShortLockLabel()}×{lockedCount}";
+        txtRecipeInfo[line].text = $"{"随机".Translate()}×{randomCount}  {"单锁".Translate()}×{lockedCount}";
         txtRecipeInfo[line].SetPosition(ProductTextX, 0f);
     }
 
     private static void ShowRectificationProductLine(int line, RectificationRecipe recipe, OutputInfo info) {
         bool forceShow = GameMain.sandboxToolsEnabled || Miscellaneous.ShowFractionateRecipeDetails;
-        string count = forceShow || info.ShowOutputCount ? recipe.GetDisplayOutputCount(info).ToString("F3") : "???";
-        string ratio = forceShow || info.ShowSuccessRatio ? info.SuccessRatio.ToString("P3") : "???";
+        int fragmentCount = GetRectificationDisplayFragmentCount(recipe.InputID, selectedInc.Value);
+        string count = forceShow || info.ShowOutputCount ? fragmentCount.ToString("F3") : "???";
+        string ratio = forceShow || info.ShowSuccessRatio ? 1.0f.ToString("P3") : "???";
 
         txtProductLeft[line].text = ratio;
         txtProductLeft[line].SetPosition(ProductRatioX, 0f);
@@ -748,16 +697,15 @@ public static class FracRecipeOperate {
         ShowTextLine(line++, "每个原料平均产出：".Translate());
 
         if (recipe is RectificationRecipe rectificationRecipe) {
-            foreach (OutputInfo info in rectificationRecipe.OutputMain) {
-                btnRecipeInfoIcons[line].gameObject.SetActive(true);
-                btnRecipeInfoIcons[line].Proto = LDB.items.Select(info.OutputID);
-                NormalizeRectWithMidLeft(btnRecipeInfoIcons[line], ProductIconX, 0f);
-                txtRecipeInfo[line].text = $"{info.SuccessRatio:P1}  ×{rectificationRecipe.GetDisplayOutputCount(info):F3}";
-                txtRecipeInfo[line].SetPosition(ProductTextX, 0f);
-                txtProductLeft[line].gameObject.SetActive(false);
-                line++;
-            }
-            return line;
+            // 精馏配方是稳定压缩：不参与成功率/损毁/双倍/返料公式，直接显示当前条件下的真实残片数。
+            int fragmentCount = GetRectificationDisplayFragmentCount(rectificationRecipe.InputID, selectedInc.Value);
+            btnRecipeInfoIcons[line].gameObject.SetActive(true);
+            btnRecipeInfoIcons[line].Proto = LDB.items.Select(IFE残片);
+            NormalizeRectWithMidLeft(btnRecipeInfoIcons[line], ProductIconX, 0f);
+            txtRecipeInfo[line].text = $"×{fragmentCount:F3}";
+            txtRecipeInfo[line].SetPosition(ProductTextX, 0f);
+            txtProductLeft[line].gameObject.SetActive(false);
+            return line + 1;
         }
 
         // E = fracRatio / (1 - fracRatio*r)，其中 fracRatio=(1-d)*s，r=remainInputRatio
@@ -765,8 +713,7 @@ public static class FracRecipeOperate {
         float pointsBonus = (float)ProcessManager.MaxTableMilli(selectedInc.Value) * plrRatio;
         float successBoost = (building?.SuccessBoost() ?? 0f) + Achievements.GetSuccessRateBonus();
         float successRatio = Mathf.Clamp01(recipe.SuccessRatio * (1 + pointsBonus) * (1 + successBoost));
-        float destroyRatio = recipe.DestroyRatio;
-        float fracRatio = (1 - destroyRatio) * successRatio;
+        float fracRatio = (1 - recipe.DestroyRatio) * successRatio;
         float remainInputRatio = recipe.RemainInputRatio;
         float repeatRatio = fracRatio * remainInputRatio;
         float repeatMultiplier = repeatRatio >= 0.9999f ? 10000.0f : 1.0f / (1.0f - repeatRatio);
@@ -817,7 +764,7 @@ public static class FracRecipeOperate {
             NormalizeRectWithMidLeft(btnRecipeInfoIcons[line], ProductIconX, 0f);
 
             txtRecipeInfo[line].text = conversionRecipe != null && lockedCnt >= 0f
-                ? $"{ShortRandomLabel()}×{outCount}  {ShortLockLabel()}×{lockedOutCount}"
+                ? $"{"随机".Translate()}×{outCount}  {"单锁".Translate()}×{lockedOutCount}"
                 : $"×{outCount}";
             txtRecipeInfo[line].SetPosition(ProductTextX, 0f);
 
@@ -838,6 +785,18 @@ public static class FracRecipeOperate {
         return fracRatio * lockedPlan.OutputCount * mainOutputBonus * repeatMultiplier;
     }
 
+    private static int GetRectificationDisplayFragmentCount(int inputId, int inputInc) {
+        int fragmentCount = GetRectificationFragmentYield(inputId, RectificationTower.PlrRatio);
+        if (RectificationTower.EnableAfterglowExtraction && inputInc >= 4) {
+            fragmentCount += 1;
+        }
+        if (RectificationTower.EnableHyperphaseCompression
+            && (inputId == GetCurrentProgressMatrixId() || inputId == I黑雾矩阵)) {
+            fragmentCount += 1;
+        }
+        return fragmentCount;
+    }
+
     // ==================== 建筑特殊特质 ====================
 
     private static int ShowBuildingFeatures(int line, ItemProto building) {
@@ -856,6 +815,12 @@ public static class FracRecipeOperate {
                 ShowTextLine(line++,
                     $"{"因果追踪".Translate()}：{FeatureStatus(ConversionTower.EnableCausalTracing)}  "
                     + $"{"单锁".Translate()}：{FeatureStatus(ConversionTower.EnableSingleLock)}");
+                break;
+            case IFE点数聚集塔:
+                ShowTextLine(line++,
+                    $"{"虚空喷射".Translate()}：{FeatureStatus(PointAggregateTower.EnableVoidSpray)}  "
+                    + $"{"双倍点数".Translate()}：{FeatureStatus(PointAggregateTower.EnableDoublePoints)}  "
+                    + $"{"最大增产等级".Translate()} {PointAggregateTower.MaxInc}");
                 break;
         }
         return line;
@@ -896,8 +861,4 @@ public static class FracRecipeOperate {
 
     private static string FeatureStatus(bool enabled) =>
         enabled ? "已启用".Translate().WithColor(Green) : "未启用".Translate().WithColor(Gray);
-
-    private static string ShortRandomLabel() => "随机简称".Translate();
-
-    private static string ShortLockLabel() => "单锁简称".Translate();
 }

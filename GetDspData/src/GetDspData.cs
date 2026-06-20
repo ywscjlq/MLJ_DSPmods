@@ -50,7 +50,7 @@ namespace GetDspData;
 public class GetDspData : BaseUnityPlugin {
     private const string DynamicIconPathPrefix = "Assets/texpack/";
     private const int ExportIconSize = 80;
-    private const string SolutionDir = @"D:\project\dsp\MLJ_DSPmods";
+    private const string SolutionDir = @"D:\project\csharp\DSP MOD\MLJ_DSPmods";
     private const string IconExportRequestPath =
         SolutionDir + @"\gamedata\calc-icon-export-request.json";
 
@@ -151,10 +151,6 @@ public class GetDspData : BaseUnityPlugin {
     }
 
     private static void WriteDataToFile() {
-        if (Localization.CurrentLanguageLCID != Localization.LCID_ZHCN) {
-            Localization.CurrentLanguageLCID = Localization.LCID_ZHCN;
-        }
-
         //如果当前语言索引非中文，直接返回
         if (Localization.CurrentLanguageLCID != Localization.LCID_ZHCN) {
             LogWarning("当前语言非中文，不生成数据文件");
@@ -457,6 +453,7 @@ public class GetDspData : BaseUnityPlugin {
             var items = new JArray();
             dataObj.Add("items", items);
             foreach (var item in LDB.items.dataArray) {
+                addItem(item, items);
                 //添加与这个物品相关的特殊配方（游戏中不存在，但是计算器需要它们来计算）
                 //0.可直接采集的物品（黑雾不算）对应开采配方需要插入到最前，以尽量规避线性规划无解
                 int firstIdx = recipes.Count;
@@ -686,7 +683,6 @@ public class GetDspData : BaseUnityPlugin {
                     AddFracRecipes(recipes, item);
                 }
             }
-            AddReferencedItems(items, recipes);
             //科技
             var techs = new JArray();
             dataObj.Add("techs", techs);
@@ -821,34 +817,6 @@ public class GetDspData : BaseUnityPlugin {
                 { "OutputAppend", BuildOutputInfoArray(recipe.OutputAppend) },
                 { "IconName", ResolveIconName(item) },
             });
-        }
-    }
-
-    private static void AddReferencedItems(JArray items, JArray recipes) {
-        HashSet<int> requiredItemIds = [];
-        foreach (JObject recipe in recipes.OfType<JObject>()) {
-            AddIds(requiredItemIds, recipe["Items"]);
-            AddIds(requiredItemIds, recipe["Results"]);
-            AddIds(requiredItemIds, recipe["Factories"]);
-        }
-
-        foreach (ItemProto item in LDB.items.dataArray.OrderBy(item => item.ID)) {
-            if (requiredItemIds.Contains(item.ID)) {
-                addItem(item, items);
-            }
-        }
-    }
-
-    private static void AddIds(HashSet<int> target, JToken token) {
-        if (token is not JArray array) {
-            return;
-        }
-
-        foreach (JToken item in array) {
-            int? id = item.Value<int?>();
-            if (id.HasValue) {
-                target.Add(id.Value);
-            }
         }
     }
 
@@ -1072,9 +1040,6 @@ public class GetDspData : BaseUnityPlugin {
             { "Name", proto.name },
             { "GridIndex", proto.GridIndex },
             { "IconName", ResolveIconName(proto) },
-            { "EnemyDropLevel", proto.EnemyDropLevel },
-            { "EnemyDropRange", new JArray(proto.EnemyDropRange.x, proto.EnemyDropRange.y) },
-            { "EnemyDropCount", proto.EnemyDropCount },
         };
         if (proto.GetSpace() >= 0) {
             //对于生产建筑，添加耗能、倍率、占地
@@ -1100,21 +1065,10 @@ public class GetDspData : BaseUnityPlugin {
                 LogWarning($"{proto.name}制造速度设为1.0");
                 obj.Add("Speed", 1.0);
             }
-            obj.Add("MultipleOutput", GetBuildingMultipleOutput(proto));
+            //obj.Add("MultipleOutput", proto.ID == I负熵熔炉 && GenesisBookEnable ? 2 : 1);
             obj.Add("Space", proto.GetSpace());
         }
         add.Add(obj);
-    }
-
-    static int GetBuildingMultipleOutput(ItemProto proto) {
-        // 这两个双倍产物来自模组 patch 行为，不是原版建筑通用数据，只能按已知建筑硬编码。
-        if (GenesisBookEnable && proto.ID == I负熵熔炉) {
-            return 2;
-        }
-        if (OrbitalRingEnable && proto.ID == I量子化工厂) {
-            return 2;
-        }
-        return 1;
     }
 
     static void addTech(TechProto proto, JArray add) {
@@ -1185,6 +1139,39 @@ public class GetDspData : BaseUnityPlugin {
             //创世+巨构情况下，多功能集成组件被专门设计为抛出异常，因为canMiningByMS已添加对应配方
             LogWarning(ex.ToString());
             return;
+        }
+        if (GenesisBookEnable && Factories.Contains(I负熵熔炉)) {
+            if ((int)proto.Type is (int)ERecipeType_GB.Smelt or (int)ERecipeType_GB.标准冶炼) {
+                //todo: 确认配方
+                Factories = Factories.Where(x => x != I负熵熔炉).ToArray();
+                addRecipe(proto, add, Factories);
+
+                RecipeProto proto2 = new RecipeProto();
+                proto.CopyPropsTo(ref proto2);
+                proto2.Type = unchecked((ERecipeType)(-1));
+                proto2.name = $"[负熵熔炉双倍产物]{proto.name}";
+                for (int i = 0; i < proto2.ResultCounts.Length; i++) {
+                    proto2.ResultCounts[i] *= 2;
+                }
+                addRecipe(proto2, add, [I负熵熔炉]);
+                return;
+            }
+        }
+        if (OrbitalRingEnable && Factories.Contains(I量子化工厂)) {
+            if ((int)proto.Type is (int)ERecipeType_OR.Chemical) {
+                Factories = Factories.Where(x => x != I量子化工厂).ToArray();
+                addRecipe(proto, add, Factories);
+
+                RecipeProto proto2 = new RecipeProto();
+                proto.CopyPropsTo(ref proto2);
+                proto2.Type = unchecked((ERecipeType)(-1));
+                proto2.name = $"[量子化工厂双倍产物]{proto.name}";
+                for (int i = 0; i < proto2.ResultCounts.Length; i++) {
+                    proto2.ResultCounts[i] *= 2;
+                }
+                addRecipe(proto2, add, [I量子化工厂]);
+                return;
+            }
         }
         addRecipe(proto, add, Factories);
     }

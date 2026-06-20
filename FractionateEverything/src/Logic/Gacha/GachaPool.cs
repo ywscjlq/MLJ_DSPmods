@@ -29,9 +29,7 @@ public enum GachaFocusMatchType {
 public enum GachaRewardType {
     None,
     RecipeUnlock,
-    RecipeProgress,
     RecipeUpgrade,
-    DrawUnitResonance,
     DuplicateRecipeFragments,
     ItemGranted,
 }
@@ -45,14 +43,12 @@ public readonly struct GachaResult {
     public readonly GachaFocusMatchType FocusMatchType;
     public readonly GachaRewardType RewardType;
     public readonly int RewardItemId;// 实际补偿/发放物品ID；配方升级时为0
-    public readonly int RewardCount;// 实际补偿/发放数量；配方升级/回响时记录升级后的等级
+    public readonly int RewardCount;// 实际补偿/发放数量；配方升级时记录升级后的等级
     public readonly bool WasHardPity;// 是否由硬保底直接产出
     public bool IsFocusHit => FocusMatchType != GachaFocusMatchType.None;
     public bool HitFocusMainTarget => FocusMatchType == GachaFocusMatchType.Main;
     public bool IsRecipe => RewardType is GachaRewardType.RecipeUnlock
-        or GachaRewardType.RecipeProgress
         or GachaRewardType.RecipeUpgrade
-        or GachaRewardType.DrawUnitResonance
         or GachaRewardType.DuplicateRecipeFragments;
 
     public GachaResult(int itemId, GachaRarity rarity, GachaFocusMatchType focusMatchType, GachaRewardType rewardType,
@@ -72,10 +68,10 @@ public readonly struct GachaResult {
 /// </summary>
 public class GachaPool {
     /// <summary>
-    /// 卡池 ID 语义合同。ID 保留为兼容层，玩家界面统一显示为主抽取偏好和成长规划。
-    /// 0=主抽取路线偏好（抽到路线抽取单位时走配方奖励逻辑）
-    /// 1=主抽取原胚偏好（抽到物品时入数据中心）
-    /// 2=成长规划（非随机，主要承载积分/定向补差）
+    /// 卡池ID语义合同：
+    /// 0=开线池（抽到配方时走配方奖励逻辑）
+    /// 1=原胚闭环池（抽到物品时入数据中心）
+    /// 2=成长池（非随机，主要承载积分/定向补差）
     /// 3=流派聚焦层（不直接抽卡，只负责方向加权）
     /// </summary>
     public const int PoolIdOpeningLine = 0;
@@ -109,7 +105,7 @@ public class GachaPool {
         return poolId >= 0 && poolId < PoolCount;
     }
 
-    /// <summary>仅主抽取路线偏好在发奖时走配方奖励逻辑。</summary>
+    /// <summary>仅开线池在发奖时走配方奖励逻辑。</summary>
     public static bool IsRecipePool(int poolId) {
         return poolId == PoolIdOpeningLine;
     }
@@ -134,7 +130,7 @@ public class GachaPool {
         return poolId == PoolIdOpeningLine || poolId == PoolIdProtoLoop;
     }
 
-    /// <summary>3.0 起抽卡只直耗当前阶段矩阵。</summary>
+    /// <summary>2.3 起抽卡只直耗当前阶段矩阵。</summary>
     public static bool CanUseDrawResource(int poolId, int resourceItemId) {
         if (!IsDrawPool(poolId)) {
             return false;

@@ -5,7 +5,6 @@ using System.Text;
 using BepInEx.Configuration;
 using FE.Logic.Buildings;
 using FE.Logic.Fractionation.Fractionators;
-using FE.Logic.Progression;
 using FE.UI.Controls;
 using FE.UI.Foundation.Window;
 using FE.UI.Layout;
@@ -30,21 +29,18 @@ public static class BuildingOperate {
     private static RectTransform tab;
 
     private static ConfigEntry<int> BuildingTypeEntry;
-    private static ItemProto SelectedBuilding => LDB.items.Select(BuildingIds[SelectedBuildingIndex]);
-    private static int SelectedBuildingIndex => BuildingTypeEntry.Value >= 0 && BuildingTypeEntry.Value < BuildingIds.Length
-        ? BuildingTypeEntry.Value
-        : 0;
+    private static ItemProto SelectedBuilding => LDB.items.Select(BuildingIds[BuildingTypeEntry.Value]);
     private static readonly int[] BuildingIds = [
-        IFE交互塔, IFE矿物复制塔, IFE转化塔, IFE精馏塔, IFE行星内物流交互站
+        IFE交互塔, IFE矿物复制塔, IFE点数聚集塔, IFE转化塔, IFE精馏塔, IFE行星内物流交互站
     ];
     private static readonly string[] BuildingTypeNames = [
-        "交互塔".Translate(), "矿物复制塔".Translate(), "转化塔".Translate(), "精馏塔".Translate(),
-        "物流交互站".Translate()
+        "交互塔".Translate(), "矿物复制塔".Translate(), "点数聚集塔".Translate(), "转化塔".Translate(),
+        "精馏塔".Translate(), "物流交互站".Translate()
     ];
     private static MyImageButton btnFragmentIcon;
     private static Text txtFragmentCount;
-    private static MyImageButton btnEssenceIcon;
-    private static Text txtEssenceCount;
+    private static MyImageButton btnMatrixIcon;
+    private static Text txtMatrixCount;
 
     private static Text txtBuildingInfo5;
     private static UIButton btnTip5;
@@ -92,6 +88,14 @@ public static class BuildingOperate {
         Register("未启用分馏永动", "Not enable fractionate forever");
         Register("启用分馏永动", "to enable fractionate forever");
 
+        Register("点数聚集效率层次", "Point accumulation efficiency level");
+        Register("点数聚集效率层次说明",
+            "The efficiency level of point accumulation affects the output rate of the product and the maximum increase in points for the product, with an upper limit of 7.",
+            "点数聚集的效率层次会影响产物的输出速率、产物的最大增产点数，上限为7。");
+        Register("点数聚集效率层次：", "Point accumulation efficiency level: ");
+        Register("+1 聚集层次", "+1 aggregate level");
+        Register("+1 点数聚集效率层次", "to +1 point accumulation efficiency level");
+
         Register("分馏塔强化功能将在以上升级全部升满后解锁。",
             "The fractionator enhancement feature will unlock once all the above upgrades have been fully completed.");
         Register("强化等级：", "Reinforcement level: ");
@@ -120,13 +124,18 @@ public static class BuildingOperate {
         // 各塔特质标题和说明（+6 特质）
         Register("分馏献祭", "Fractionation Sacrifice");
         Register("分馏献祭说明",
-            "When the data centre holds at least 1000 fractionators of a type, the sacrifice trait consumes 10% of the current stock each second. With n fractionators sacrificed last second, fractionate recipes' success rate of the same type is increased by sqrt(n)/10, rounded down to 5% steps.",
-            "当某类分馏塔在数据中心达到1000个时，献祭特质每秒消耗当前库存的10%。上一秒献祭n个分馏塔时，同类型分馏配方获得 sqrt(n)/10 的成功率加成，并向下取整到5%阶梯。");
+            "When the total number of fractionators in the data centre exceeds 1000, they are automatically decomposed at 10% per second. With n decomposed fractionators, fractionate recipes' success rate of the same type increased by 1+n/60 times.",
+            "当数据中心的分馏塔数目超过1000时，会以每秒10%的速率自动分解。损毁n个分馏塔时，同类型分馏配方成功率变为 1+n/60 倍。");
 
         Register("质能裂变", "Mass-Energy Fission");
         Register("质能裂变说明",
             "Maintains an internal point pool (target: 100 x max stack). When the pool drops below the target, raw materials are consumed in bulk to replenish it (25 pts/item; 50 pts/item when Zero-Pressure Cycle is also active). When average proliferator points of inputs is below 10, points are drawn from the pool to bring them to 10.",
             "塔内维持一个点数池（目标值：100×最大集装）。当池量低于目标值时，批量消耗原料补满（每个原料换25点，同时激活零压循环时换50点）。当输入原料平均增产点数不足10时，从池中取点补足至10。");
+
+        Register("虚空喷涂", "Void Spray");
+        Register("虚空喷涂说明",
+            "When the average proliferator points of inputs is below 4, the tower automatically uses proliferators from the fractionation data centre to spray the inputs.",
+            "当原料的平均增产点数不足4时，会自动使用分馏数据中心的增产剂对原料进行喷涂。");
 
         Register("因果溯源", "Causal Tracing");
         Register("因果溯源说明",
@@ -136,13 +145,18 @@ public static class BuildingOperate {
         // 各塔特质标题和说明（+12 特质）
         Register("维度共鸣", "Dimensional Resonance");
         Register("维度共鸣说明",
-            "Sacrifice progress is calculated as n*(1 + 0.1*number of fractionator types with sacrifice progress).",
-            "献祭进度视为 n*(1+0.1*具有献祭进度的分馏塔种类数)。");
+            "The number of damaged fractionators is calculated as n*(1 + 0.1*number of fractionator types with sacrifice bonuses).",
+            "损毁的分馏塔数目视为 n*(1+0.1*具有献祭加成的分馏塔种类数)。");
 
         Register("零压循环", "Zero-Pressure Cycle");
         Register("零压循环说明",
             "Each consumed raw material replenishes the point pool by 50 points (overriding Mass-Energy Fission's 25 pts). When there is no output belt on either side, flow output is automatically returned to flow input; product output is also prioritised for return to flow input.",
             "每个被消耗的原料向点数池补充50点（覆盖质能裂变的25点）。当侧面无输出传送带时，流动输出自动回填至流动输入；产物输出也优先回填至流动输入。");
+
+        Register("双重点数", "Double Points");
+        Register("双重点数说明",
+            "Each 1 proliferator point on the input is converted as 2 points during transfer.",
+            "原料的1点增产点数在转移时变为2点。");
 
         Register("单路锁定", "Single-Path Lock");
         Register("单路锁定说明",
@@ -151,13 +165,13 @@ public static class BuildingOperate {
 
         Register("余辉萃取", "Afterglow Extraction");
         Register("余辉萃取说明",
-            "Improves high-order rectification stability. It is reserved for the hyperphase-ratio upgrade path.",
-            "提高高阶精馏稳定性，预留给高阶成相率升级链路。");
+            "When the average proliferator points of inputs is at least 4, the current rectification grants 1 extra Fragment.",
+            "当输入原料平均增产点数不少于4时，本次精馏额外产出1个残片。");
 
         Register("超相压缩", "Hyperphase Compression");
         Register("超相压缩说明",
-            "Unlocks the late-stage concept of essence compression. Essence tuning currently follows the global compression weight model.",
-            "解锁后期精华压缩概念；当前精华调相按全局压缩权重模型结算。");
+            "When the input is the current stage matrix or a Dark Fog Matrix, the current rectification grants 1 additional Fragment after other bonuses.",
+            "当输入为当前阶段矩阵或黑雾矩阵时，本次精馏在其他效果结算后再额外产出1个残片。");
 
         Register("特质1（+6）：", "Trait 1 (+6): ");
         Register("特质2（+12）：", "Trait 2 (+12): ");
@@ -169,11 +183,6 @@ public static class BuildingOperate {
         Register("关键节点突破", "Breakthrough");
         Register("已满级", "Maxed");
         Register("当前等级需要靠经验自动成长", "This level advances automatically via EXP", "当前等级需要靠经验自动成长");
-        Register("待机/运行电力消耗", "Idle/working power consumption");
-        Register("上传/下载电力消耗", "Upload/download power consumption");
-        Register("物品最大堆叠", "Max item stack");
-        Register("增产剂效果", "Proliferator effect");
-        Register("原料流动增强", "Input flow enhancement");
         Register("能耗", "Enrg");
         Register("增产", "Prolif");
         Register("最大增产点数", "Max Inc Pts");
@@ -218,10 +227,10 @@ public static class BuildingOperate {
                                         pos: (0, 3), objectName: "building-fragment-icon"),
                                     TextNode("", 13, onBuilt: text => txtFragmentCount = text,
                                         pos: (0, 4), objectName: "building-fragment-count"),
-                                    ImageButtonNode(size: 40f, onBuilt: btn => btnEssenceIcon = btn,
-                                        pos: (0, 5), objectName: "building-essence-icon"),
-                                    TextNode("", 13, onBuilt: text => txtEssenceCount = text,
-                                        pos: (0, 6), objectName: "building-essence-count"),
+                                    ImageButtonNode(size: 40f, onBuilt: btn => btnMatrixIcon = btn,
+                                        pos: (0, 5), objectName: "building-matrix-icon"),
+                                    TextNode("", 13, onBuilt: text => txtMatrixCount = text,
+                                        pos: (0, 6), objectName: "building-matrix-count"),
                                 ]),
                             Grid(pos: (1, 0), span: (1, 2), cols: [1, 1, 1, 1], columnGap: 12f,
                                 children: [
@@ -307,6 +316,7 @@ public static class BuildingOperate {
         return buildingId switch {
             IFE交互塔 => ("分馏献祭", "分馏献祭说明", "维度共鸣", "维度共鸣说明"),
             IFE矿物复制塔 => ("质能裂变", "质能裂变说明", "零压循环", "零压循环说明"),
+            IFE点数聚集塔 => ("虚空喷涂", "虚空喷涂说明", "双重点数", "双重点数说明"),
             IFE转化塔 => ("因果溯源", "因果溯源说明", "单路锁定", "单路锁定说明"),
             IFE精馏塔 => ("余辉萃取", "余辉萃取说明", "超相压缩", "超相压缩说明"),
             _ => (null, null, null, null),
@@ -317,12 +327,12 @@ public static class BuildingOperate {
         if (!tab.gameObject.activeSelf) {
             return;
         }
-        int currentEssenceId = GetMatrixEssenceItemId(GetCurrentProgressStageIndex());
-        btnEssenceIcon.Proto = LDB.items.Select(currentEssenceId);
+        int currentMatrixId = GetCurrentProgressMatrixId();
+        btnMatrixIcon.Proto = LDB.items.Select(currentMatrixId);
         btnFragmentIcon.SetCount(GetItemTotalCount(IFE残片));
-        btnEssenceIcon.SetCount(GetItemTotalCount(currentEssenceId));
+        btnMatrixIcon.SetCount(GetItemTotalCount(currentMatrixId));
         txtFragmentCount.text = "";
-        txtEssenceCount.text = "";
+        txtMatrixCount.text = "";
 
         string s = $"{"当前建筑强化等级".Translate()} +{SelectedBuilding.Level()}";
         txtBuildingInfo5.text = s.WithColor(SelectedBuilding.Level() / 3 + 1);
@@ -441,10 +451,14 @@ public static class BuildingOperate {
             return $"+{level}  ×{stack}  {"交互电力".Translate()}{LevelToInteractEnergyRatio(level):P0}";
         }
         float energy = LevelToEnergyRatio(level);
+        if (buildingId == IFE点数聚集塔) {
+            int maxInc = Math.Min(level + 4, 10);
+            return $"+{level}  ×{stack}  {"能耗".Translate()}{energy:P0}  {"最大增产点数".Translate()}{maxInc}";
+        }
         return $"+{level}  ×{stack}  {"能耗".Translate()}{energy:P0}  {"增产".Translate()}×{LevelToPlrRatio(level):F1}";
     }
 
-    private static int LevelToMaxStack(int level) => StackingManager.CurrentMaxStack;
+    private static int LevelToMaxStack(int level) => BuildingGrowthService.GetDefaultMaxStackByLevel(level);
 
     private static float LevelToEnergyRatio(int level) => BuildingGrowthService.GetDefaultEnergyRatioByLevel(level);
 
@@ -464,16 +478,16 @@ public static class BuildingOperate {
             UIRealtimeTip.Popup("当前等级需要靠经验自动成长".Translate(), true, 2);
             return;
         }
-        (int essenceId, int essenceCount, int fragmentCount) =
+        (int matrixId, int matrixCount, int fragmentCount) =
             BuildingGrowthService.GetBreakthroughCost(SelectedBuilding.Level());
-        string essenceName = LDB.items.Select(essenceId)?.name ?? essenceId.ToString();
+        string matrixName = LDB.items.Select(matrixId)?.name ?? matrixId.ToString();
         Miscellaneous.ShowQuestion("提示".Translate(),
             (GameMain.sandboxToolsEnabled
                 ? ""
-                : $"{"要花费".Translate()} {essenceName} x {essenceCount} + 残片 x {fragmentCount} ")
+                : $"{"要花费".Translate()} {matrixName} x {matrixCount} + 残片 x {fragmentCount} ")
             + $"{"关键节点突破".Translate()}{"吗？".Translate()}",
             () => {
-                if (!TakeItemWithTip(essenceId, essenceCount, out _)
+                if (!TakeItemWithTip(matrixId, matrixCount, out _)
                     || !TakeItemWithTip(IFE残片, fragmentCount, out _)) {
                     return;
                 }
@@ -507,8 +521,8 @@ public static class BuildingOperate {
     #endregion
 
     private static string GetBreakthroughCostText(int currentLevel) {
-        (int essenceId, int essenceCount, int fragmentCount) = BuildingGrowthService.GetBreakthroughCost(currentLevel);
-        string essenceName = LDB.items.Select(essenceId)?.name ?? essenceId.ToString();
-        return $"{essenceName} x{essenceCount} + 残片 x{fragmentCount}";
+        (int matrixId, int matrixCount, int fragmentCount) = BuildingGrowthService.GetBreakthroughCost(currentLevel);
+        string matrixName = LDB.items.Select(matrixId)?.name ?? matrixId.ToString();
+        return $"{matrixName} x{matrixCount} + 残片 x{fragmentCount}";
     }
 }

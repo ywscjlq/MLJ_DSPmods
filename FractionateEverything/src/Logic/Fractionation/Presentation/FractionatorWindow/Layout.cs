@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using HarmonyLib;
@@ -66,9 +66,6 @@ public static partial class FractionatorWindow {
 
     // ===== 初始化：复制窗口并一次性修改布局 =====
 
-    /// <summary>
-    /// 创建并初始化模组分馏塔窗口实例。
-    /// </summary>
     [HarmonyPostfix]
     [HarmonyPatch(typeof(UIFractionatorWindow), nameof(UIFractionatorWindow._OnInit))]
     public static void CreateModWindowInstance(UIFractionatorWindow __instance) {
@@ -160,19 +157,6 @@ public static partial class FractionatorWindow {
         Vector3 fluidPos = new Vector3(_itemBoxLocalPos.x + _layoutOffsetX, FluidY, _itemBoxLocalPos.z);
         fluidSlot = CreateSlot(window, vanillaWindow, fluidPos);
 
-        // 不要分割线了
-        // // 复制分割线，主产物-副产物之间、副产物-流动输出之间
-        // GameObject newSep12 = Object.Instantiate(window.sepLine1.gameObject, window.transform);
-        // newSep12.name = "sep-line-12-extra";
-        // newSep12.transform.localPosition = new Vector3(
-        //     window.sepLine1.transform.localPosition.x,
-        //     (MainY + SideY) / 2,
-        //     window.sepLine1.transform.localPosition.z);
-        // GameObject newSep23 = Object.Instantiate(window.sepLine1.gameObject, window.transform);
-        // newSep23.name = "sep-line-23-extra";
-        // newSep23.transform.localPosition = new Vector3(
-        //     window.sepLine1.transform.localPosition.x,
-        //     (SideY + FluidY) / 2,
         //     window.sepLine1.transform.localPosition.z);
 
         // 流动输出右侧的提示文字，包括配方强化等级、损毁率
@@ -187,7 +171,36 @@ public static partial class FractionatorWindow {
             fluidRightText.verticalOverflow = VerticalWrapMode.Overflow;
             fluidRightText.supportRichText = true;
             fluidRightText.fontSize = 14;
+            fluidRightText.resizeTextForBestFit = false;
             frGo.SetActive(false);
+            
+            // 词缀独立文本区: 全新创建GameObject, 避免继承原版属性导致模糊
+            // 修复1: fontSize 14→16, 去掉material继承(描边导致笔画粘连)
+            // 修复2: 位置下移至FluidY-260, 高度200px, 确保在所有内容之下
+            if (window.oriProductProbText != null) {
+                GameObject affixGo = new GameObject("affix-text");
+                affixGo.transform.SetParent(window.transform, false);
+                affixGo.transform.localPosition = new Vector3(10f, FluidY - 260f, _itemBoxLocalPos.z);
+                affixGo.layer = window.gameObject.layer;
+                var affixRt = affixGo.AddComponent<RectTransform>();
+                affixRt.sizeDelta = new Vector2(580f, 200f);
+                affixRt.pivot = new Vector2(0f, 0f);
+                affixRt.anchorMin = Vector2.zero;
+                affixRt.anchorMax = Vector2.zero;
+                _affixText = affixGo.AddComponent<Text>();
+                _affixText.font = window.oriProductProbText.font;
+                // 不复制 material：原版 material 可能带描边/加粗效果导致笔画粘连
+                _affixText.text = "";
+                _affixText.fontSize = 16;
+                _affixText.alignment = TextAnchor.UpperLeft;
+                _affixText.horizontalOverflow = HorizontalWrapMode.Overflow;
+                _affixText.verticalOverflow = VerticalWrapMode.Overflow;
+                _affixText.supportRichText = true;
+                _affixText.lineSpacing = 1.2f;
+                _affixText.resizeTextForBestFit = false;
+                _affixText.color = Color.white;
+                affixGo.SetActive(false);
+            }
 
             lockStateText = CreateLabel(window, fluidRightText, "单锁".Translate(),
                 new Vector3(_itemBoxLocalPos.x + 80f + _layoutOffsetX, FluidY - 38f, _itemBoxLocalPos.z));
@@ -280,6 +293,23 @@ public static partial class FractionatorWindow {
             }
         }
 
+        // 同步更新窗口内所有 RectMask2D 的裁剪区域
+        var masks = modRootRect.GetComponentsInChildren<RectMask2D>(true);
+        for (int mi = 0; mi < masks.Length; mi++) {
+            if (masks[mi] != null) {
+                // 给 RectMask2D 所在节点的 RectTransform 同步扩展
+                var maskRt = masks[mi].GetComponent<RectTransform>();
+                if (maskRt != null && maskRt != modRootRect) {
+                    Vector2 baseSz = maskRt.sizeDelta;
+                    // 如果该节点 sizeDelta 与根节点接近, 已经在上面的 resizableRects 中更新了
+                    // 否则智能扩展: 判断方向
+                    if (Mathf.Abs(baseSz.x - rootBaseSize.x) > 0.01f || Mathf.Abs(baseSz.y - rootBaseSize.y) > 0.01f) {
+                        maskRt.sizeDelta = new Vector2(baseSz.x + addWidth, baseSz.y + addHeight);
+                    }
+                }
+            }
+        }
+
         Vector3 newTopLeft = GetTopLeftWorld(modRootRect);
         Vector3 delta = oldTopLeft - newTopLeft;
         modRootRect.position += delta;
@@ -334,6 +364,10 @@ public static partial class FractionatorWindow {
         if (lockHintText != null) {
             lockHintText.transform.localPosition = new Vector3(
                 _itemBoxLocalPos.x + 80f + _layoutOffsetX, fluidY - 56f, _itemBoxLocalPos.z);
+        }
+        if (_affixText != null) {
+            _affixText.transform.localPosition = new Vector3(
+                10f + _layoutOffsetX, fluidY - 260f, _itemBoxLocalPos.z);
         }
     }
 

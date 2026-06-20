@@ -24,7 +24,6 @@ public static partial class Utils {
     /// <param name="min">下界（包含）</param>
     /// <param name="max">上界（不包含）</param>
     public static int GetRandInt(int min, int max) {
-        // if (min >= max) return min;
         randSeed = (uint)((randSeed % 2147483646U + 1U) * 48271UL % int.MaxValue) - 1U;
         double randomValue = randSeed / 2147483646.0;
         return (int)(randomValue * (max - min)) + min;

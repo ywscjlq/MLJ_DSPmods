@@ -18,7 +18,7 @@ namespace FE.UI.MainPanel.DrawGrowth;
 
 /// <summary>
 /// 成长规划 / 流派聚焦页。
-/// 成长规划承担确定性补差，聚焦页只负责方向偏置和成长报价修正，不再伪装成独立抽卡池。
+/// 成长池承担确定性补差，聚焦页只负责方向偏置和成长报价修正，不再伪装成独立抽卡池。
 /// </summary>
 public static class LimitedTimeStore {
     private const int GrowthRowCount = 8;
@@ -104,7 +104,7 @@ public static class LimitedTimeStore {
                         children: BuildGrowthResourceNodes()),
                     ContentCard(pos: (2, 0), objectName: "growth-store-offer-card",
                         rows: BuildGrowthOfferRows(),
-                        cols: [Fr(1), Px(44f), Px(44f), Px(24f), Px(44f), Fr(3), Fr(1)],
+                        cols: [Fr(1), Px(44f), Px(44f), Fr(1), Px(44f), Fr(2), Fr(1)],
                         rowGap: 4f,
                         columnGap: 8f,
                         children: BuildGrowthOfferNodes()),
@@ -208,10 +208,11 @@ public static class LimitedTimeStore {
                 pos: (rowPos, 3), objectName: $"growth-store-extra-cost-{rowIndex}"));
             nodes.Add(ImageButtonNode(size: 40f, onBuilt: btn => row.BtnRewardIcon = btn,
                 pos: (rowPos, 4), objectName: $"growth-store-reward-icon-{rowIndex}"));
-            nodes.Add(TextNode("", 12, wrap: true, onBuilt: text => row.TxtReward = text,
+            nodes.Add(TextNode("", 13, wrap: true, onBuilt: text => row.TxtReward = text,
                 pos: (rowPos, 5), objectName: $"growth-store-reward-{rowIndex}"));
             nodes.Add(TextNode("", 12, wrap: true, onBuilt: text => row.TxtDetail = text,
-                pos: (rowPos, 5), objectName: $"growth-store-detail-{rowIndex}"));
+                pos: (rowPos, 5), margin: Inset(0f, 18f, 0f, 0f),
+                objectName: $"growth-store-detail-{rowIndex}"));
             nodes.Add(ButtonNode("兑换", fontSize: 13, onBuilt: btn => row.BtnExchange = btn,
                 onClick: () => ExchangeOffer(row),
                 pos: (rowPos, 6), objectName: $"growth-store-exchange-{rowIndex}"));
@@ -275,10 +276,6 @@ public static class LimitedTimeStore {
                 _ => $"{itemName} 转化配方暂未推进",
             };
             UIRealtimeTip.Popup(message);
-        } else if (GachaService.IsEssenceCatalystOffer(offer)) {
-            UIRealtimeTip.Popup(reward.RewardCount > 0
-                ? $"{itemName} 已催化 {reward.RewardCount} 个精馏配方"
-                : $"{itemName} 暂无可催化的精馏配方");
         } else {
             UIRealtimeTip.Popup($"获得 {itemName} x{reward.RewardCount}");
         }
@@ -319,7 +316,7 @@ public static class LimitedTimeStore {
                 growthPage.Rows[i].TxtExtraCost.gameObject.SetActive(visible);
                 growthPage.Rows[i].BtnRewardIcon.gameObject.SetActive(visible);
                 growthPage.Rows[i].TxtReward.gameObject.SetActive(visible);
-                growthPage.Rows[i].TxtDetail.gameObject.SetActive(false);
+                growthPage.Rows[i].TxtDetail.gameObject.SetActive(visible);
                 growthPage.Rows[i].BtnExchange.gameObject.SetActive(visible);
                 if (!visible) {
                     continue;
@@ -341,13 +338,12 @@ public static class LimitedTimeStore {
                 }
                 growthPage.Rows[i].BtnRewardIcon.Proto = LDB.items.Select(offer.OutputId);
                 growthPage.Rows[i].BtnRewardIcon.SetCount(offer.OutputCount);
-                growthPage.Rows[i].TxtReward.text = GetOfferRowText(offer);
-                growthPage.Rows[i].TxtDetail.text = "";
+                growthPage.Rows[i].TxtReward.text = GetOfferRewardText(offer);
+                growthPage.Rows[i].TxtDetail.text = GetOfferDetailText(offer);
                 bool canBuy = GachaManager.GetPoolPoints(GachaPool.PoolIdGrowth) >= offer.PointCost
                               && GetItemTotalCount(IFE残片) >= offer.FragmentCost
                               && (offer.ExtraCostItemId <= 0
-                                  || GetItemTotalCount(offer.ExtraCostItemId) >= offer.ExtraCostCount)
-                              && GachaService.CanApplyEssenceCatalystOffer(offer);
+                                  || GetItemTotalCount(offer.ExtraCostItemId) >= offer.ExtraCostCount);
                 growthPage.Rows[i].BtnExchange.button.interactable = canBuy;
             }
         }
@@ -377,24 +373,12 @@ public static class LimitedTimeStore {
         return GachaService.GetFocusName(GachaManager.CurrentFocus);
     }
 
-    private static string GetOfferRowText(GachaGrowthOffer offer) {
-        string reward = GetOfferRewardText(offer);
-        string detail = GetOfferDetailText(offer);
-        return string.IsNullOrEmpty(reward) ? detail : $"{reward}。{detail}";
-    }
-
     private static string GetOfferRewardText(GachaGrowthOffer offer) {
-        if (GachaService.TryGetGrowthOfferMaxedFragmentPreview(offer, out int fragmentCount)) {
-            return $"已满级，兑换后转为残片 x{fragmentCount}".WithColor(Gold);
-        }
         if (GachaService.IsDarkFogCatchupOffer(offer)) {
             return "配方成长";
         }
         if (GachaService.IsDarkFogRecipeGrowthOffer(offer)) {
             return "转化配方成长";
-        }
-        if (GachaService.IsEssenceCatalystOffer(offer)) {
-            return "精馏催化";
         }
         return string.Empty;
     }
@@ -402,7 +386,7 @@ public static class LimitedTimeStore {
     private static string GetOfferDetailText(GachaGrowthOffer offer) {
         if (offer.FocusType == GachaFocusType.Balanced) {
             if (offer.ExtraCostItemId == I黑雾矩阵) {
-                if (GachaService.IsEnhancedDarkFogRewardItem(offer.OutputId)) {
+                if (DarkFogCombatManager.IsEnhancedRewardItem(offer.OutputId)) {
                     return "黑雾增强层报价：消耗黑雾矩阵换取战斗支线的后段突破资源。".WithColor(Gold);
                 }
                 if (GachaService.IsDarkFogRecipeGrowthOffer(offer)) {
@@ -414,22 +398,9 @@ public static class LimitedTimeStore {
         }
 
         string focusName = GachaService.GetFocusName(offer.FocusType);
-        if (GachaService.IsEssenceCatalystOffer(offer)) {
-            string baseText = $"精华催化：消耗矩阵精华，推进同阶段及以下已解锁精馏配方成长 +{offer.OutputCount}";
-            if (!GachaService.CanApplyEssenceCatalystOffer(offer)) {
-                return $"{baseText}。当前没有可催化目标。".WithColor(White);
-            }
-            if (!GachaService.IsFocusedGrowthOffer(offer)) {
-                return $"{baseText}。切到 {focusName} 后才会降价。".WithColor(White);
-            }
-            float catalystDiscountPercent = GachaService.GetFocusedOfferDiscountFactor() * 100f;
-            return $"{baseText}。已命中 {focusName}：积分/残片按 {catalystDiscountPercent:0}% 成本结算".WithColor(
-                Green);
-        }
-
         if (!GachaService.IsFocusedGrowthOffer(offer)) {
             string prefix = offer.ExtraCostItemId == I黑雾矩阵
-                ? GachaService.IsEnhancedDarkFogRewardItem(offer.OutputId) ? "黑雾增强层报价。" :
+                ? DarkFogCombatManager.IsEnhancedRewardItem(offer.OutputId) ? "黑雾增强层报价。" :
                 GachaService.IsDarkFogRecipeGrowthOffer(offer) ? "黑雾支线配方报价。" : "黑雾支线报价。"
                 : "成长定向：";
             return $"{prefix}{focusName}。切到该方向后才会降价/加量。".WithColor(White);
@@ -437,7 +408,7 @@ public static class LimitedTimeStore {
 
         float discountPercent = GachaService.GetFocusedOfferDiscountFactor() * 100f;
         string detail = offer.ExtraCostItemId == I黑雾矩阵
-            ? GachaService.IsEnhancedDarkFogRewardItem(offer.OutputId) ?
+            ? DarkFogCombatManager.IsEnhancedRewardItem(offer.OutputId) ?
                 $"黑雾增强层命中 {focusName}：积分/残片按 {discountPercent:0}% 成本结算" :
                 GachaService.IsDarkFogRecipeGrowthOffer(offer) ?
                     $"黑雾支线配方命中 {focusName}：积分/残片按 {discountPercent:0}% 成本结算" :
@@ -462,17 +433,11 @@ public static class LimitedTimeStore {
     private static string GetCurrentFocusEffectText() {
         float discountPercent = GachaService.GetFocusedOfferDiscountFactor() * 100f;
         return GachaManager.CurrentFocus switch {
-            GachaFocusType.Balanced => "平衡发展：主抽取不额外偏置，成长规划只保留常规补差。".WithColor(White),
-            GachaFocusType.MineralExpansion => $"复制扩张：主抽取路线更偏矿物复制抽取单位，成长规划命中条目按 {discountPercent:0}% 成本结算。".WithColor(Green),
-            GachaFocusType.ConversionLeap => $"转化跃迁：主抽取路线更偏转化链抽取单位，成长规划命中条目按 {discountPercent:0}% 成本结算。".WithColor(Green),
+            GachaFocusType.Balanced => "平衡发展：开线池与原胚池不额外偏置，成长页只保留常规补差。".WithColor(White),
+            GachaFocusType.MineralExpansion => $"复制扩张：开线池更偏矿物复制，成长页命中条目按 {discountPercent:0}% 成本结算。".WithColor(Green),
+            GachaFocusType.ConversionLeap => $"转化跃迁：开线池更偏转化配方，成长页命中条目按 {discountPercent:0}% 成本结算。".WithColor(Green),
             GachaFocusType.LogisticsInteraction =>
-                $"交互物流：主抽取路线偏物流链抽取单位，原胚方向偏交互塔，成长规划命中条目按 {discountPercent:0}% 成本结算。".WithColor(Green),
-            GachaFocusType.EmbryoCycle =>
-                $"原胚循环：主抽取偏未解锁抽取单位与定向原胚，成长规划命中条目按 {discountPercent:0}% 成本并额外 +1。".WithColor(Green),
-            GachaFocusType.ProcessOptimization => $"工艺优化：主抽取路线偏当前阶段抽取单位，原胚方向偏转化塔，成长规划命中条目按 {discountPercent:0}% 成本结算。"
-                .WithColor(Green),
-            GachaFocusType.RectificationEconomy => $"精馏经济：主抽取路线偏精馏家族，原胚方向偏精馏塔，成长规划命中条目按 {discountPercent:0}% 成本结算。"
-                .WithColor(Green),
+                $"交互物流：开线池偏物流链，原胚池偏交互塔，成长页命中条目按 {discountPercent:0}% 成本结算。".WithColor(Green),
             _ => string.Empty,
         };
     }
@@ -481,21 +446,13 @@ public static class LimitedTimeStore {
         float discountPercent = GachaService.GetFocusedOfferDiscountFactor() * 100f;
         string activePrefix = active ? "当前生效。" : "切换后生效。";
         return focusType switch {
-            GachaFocusType.Balanced => $"{activePrefix} 不额外偏置主抽取，成长规划不触发方向折扣。".WithColor(active ? Green : White),
+            GachaFocusType.Balanced => $"{activePrefix} 不额外偏置两类抽池，成长页不触发方向折扣。".WithColor(active ? Green : White),
             GachaFocusType.MineralExpansion =>
-                $"{activePrefix} 主抽取路线更偏矿物复制抽取单位，成长规划命中条目按 {discountPercent:0}% 成本结算。".WithColor(active ? Green : White),
-            GachaFocusType.ConversionLeap => $"{activePrefix} 主抽取路线更偏转化链抽取单位，成长规划命中条目按 {discountPercent:0}% 成本结算。".WithColor(
+                $"{activePrefix} 开线池更偏矿物复制，成长页命中条目按 {discountPercent:0}% 成本结算。".WithColor(active ? Green : White),
+            GachaFocusType.ConversionLeap => $"{activePrefix} 开线池更偏转化配方，成长页命中条目按 {discountPercent:0}% 成本结算。".WithColor(
                 active ? Green : White),
             GachaFocusType.LogisticsInteraction =>
-                $"{activePrefix} 主抽取路线偏物流链抽取单位，原胚方向偏交互塔原胚，成长规划命中条目按 {discountPercent:0}% 成本结算。".WithColor(
-                    active ? Green : White),
-            GachaFocusType.EmbryoCycle => $"{activePrefix} 主抽取偏未解锁抽取单位与定向原胚，成长规划命中条目按 {discountPercent:0}% 成本并额外 +1。"
-                .WithColor(active ? Green : White),
-            GachaFocusType.ProcessOptimization =>
-                $"{activePrefix} 主抽取路线偏当前阶段抽取单位，原胚方向偏转化塔，成长规划命中条目按 {discountPercent:0}% 成本结算。".WithColor(
-                    active ? Green : White),
-            GachaFocusType.RectificationEconomy =>
-                $"{activePrefix} 主抽取路线偏精馏家族，原胚方向偏精馏塔，成长规划命中条目按 {discountPercent:0}% 成本结算。".WithColor(
+                $"{activePrefix} 开线池偏物流链，原胚池偏交互塔原胚，成长页命中条目按 {discountPercent:0}% 成本结算。".WithColor(
                     active ? Green : White),
             _ => string.Empty,
         };

@@ -2,11 +2,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <Import Project="..\DefaultPath.props" Condition="Exists('..\DefaultPath.props')"/>
     <PropertyGroup>
-        <OutputType>Library</OutputType>
         <RootNamespace>FE</RootNamespace>
         <AssemblyName>FractionateEverything</AssemblyName>
         <PackageId>FractionateEverything</PackageId>
-        <Version>3.0.0</Version>
+        <Version>2.3.0</Version>
         <Description>DSP MOD - FractionateEverything</Description>
         <BepInExPluginGuid>com.menglei.dsp.fe</BepInExPluginGuid>
         <ProfileDir Condition="'$(ProfileDir)' == '' and '$(USERPROFILE)' != ''">$(USERPROFILE)\AppData\Roaming\r2modmanPlus-local\DysonSphereProgram\profiles\Default</ProfileDir>
@@ -15,8 +14,6 @@
         <BuildBarToolHintPath Condition="'$(BuildBarToolHintPath)' == '' and Exists('$(R2PluginsDir)\jinxOAO-BuildBarTool\BuildBarTool.dll.old')">$(R2PluginsDir)\jinxOAO-BuildBarTool\BuildBarTool.dll.old</BuildBarToolHintPath>
         <TheyComeFromVoidHintPath Condition="Exists('$(R2PluginsDir)\ckcz123-TheyComeFromVoid\DSP_Battle.dll')">$(R2PluginsDir)\ckcz123-TheyComeFromVoid\DSP_Battle.dll</TheyComeFromVoidHintPath>
         <TheyComeFromVoidHintPath Condition="'$(TheyComeFromVoidHintPath)' == '' and Exists('$(R2PluginsDir)\ckcz123-TheyComeFromVoid\DSP_Battle.dll.old')">$(R2PluginsDir)\ckcz123-TheyComeFromVoid\DSP_Battle.dll.old</TheyComeFromVoidHintPath>
-        <GenesisBookHintPath Condition="Exists('$(R2PluginsDir)\HiddenCirno-GenesisBook\ProjectGenesis.dll')">$(R2PluginsDir)\HiddenCirno-GenesisBook\ProjectGenesis.dll</GenesisBookHintPath>
-        <GenesisBookHintPath Condition="'$(GenesisBookHintPath)' == '' and Exists('$(R2PluginsDir)\HiddenCirno-GenesisBook\ProjectGenesis.dll.old')">$(R2PluginsDir)\HiddenCirno-GenesisBook\ProjectGenesis.dll.old</GenesisBookHintPath>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="BepInEx.Core" Version="5.4.17"/>
@@ -41,17 +38,11 @@
             <HintPath>$(TheyComeFromVoidHintPath)</HintPath>
             <Private>false</Private>
         </Reference>
-        <Reference Include="ProjectGenesis">
-            <HintPath>$(GenesisBookHintPath)</HintPath>
-            <Private>false</Private>
-        </Reference>
     </ItemGroup>
     <Target Name="ValidateExternalModReferences" BeforeTargets="ResolveReferences">
         <Error Condition="'$(BuildBarToolHintPath)' == ''"
                Text="未在 R2 中找到 BuildBarTool.dll 或 BuildBarTool.dll.old；请检查 ProfileDir 与 jinxOAO-BuildBarTool 安装状态。"/>
         <Error Condition="'$(TheyComeFromVoidHintPath)' == ''"
                Text="未在 R2 中找到 DSP_Battle.dll 或 DSP_Battle.dll.old；请检查 ProfileDir 与 ckcz123-TheyComeFromVoid 安装状态。"/>
-        <Error Condition="'$(GenesisBookHintPath)' == ''"
-               Text="未在 R2 中找到 ProjectGenesis.dll 或 ProjectGenesis.dll.old；请检查 ProfileDir 与 HiddenCirno-GenesisBook 安装状态。"/>
     </Target>
 </Project>

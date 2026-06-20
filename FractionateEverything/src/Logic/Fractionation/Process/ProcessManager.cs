@@ -1,9 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using UnityEngine;
 using FE.Logic.Buildings;
+using FE.Logic.Fractionation.Affix;
 using FE.Logic.Fractionation.Fractionators;
 using FE.Logic.Fractionation.Growth;
 using FE.Logic.Fractionation.FracRecipes;
@@ -15,206 +16,114 @@ using static FE.Logic.Station.ProliferatorPool;
 
 namespace FE.Logic.Fractionation.Process;
 
-/// <summary>
-/// 修改所有分馏塔的处理逻辑，以及对应的显示。
-/// </summary>
 public static partial class ProcessManager {
     private delegate void FractionatorUpdateHandler(ref FractionatorComponent fractionator,
         PlanetFactory factory, float power, SignData[] signPool, int[] productRegister, int[] consumeRegister,
         ref uint result);
 
     private static readonly FractionatorUpdateHandler[] updateHandlersByBuildingOffset = [
-        UpdateInteractionTower,
-        UpdateMineralReplicationTower,
-        UpdateConversionTower,
-        UpdateRectificationTower,
+        UpdateInteractionTower, UpdateMineralReplicationTower, UpdatePointAggregateTower,
+        UpdateConversionTower, UpdateRectificationTower,
     ];
 
-    /// <summary>
-    /// 注册该分馏域对象需要的本地化文本。
-    /// </summary>
     public static void AddTranslations() {
-        Register("交互模式", "Interaction mode");
-        Register("原料堆积", "Fluid overflow");
-        Register("搬运模式", "Transport mode");
-        Register("缺少精华", "Lack of fragments", "缺少残片");
-        Register("分馏永动", "Frac forever");
-        Register("无配方", "No recipe");
-        Register("主产物", "Main product");
-        Register("副产物", "Append product");
-        Register("流动", "Flow");
-        Register("损毁", "Destroy");
-        Register("流动输入", "Flow input");
-        Register("流动输出", "Flow output");
-        Register("配方不存在", "Recipe does not exist");
-        Register("配方强化", "Recipe enhancement");
-        Register("单锁", "Single Lock");
-        Register("单锁产物数目", "Single-lock output count");
-        Register("未锁定", "Not locked");
-        Register("右键设为单锁", "Right-click to lock this output");
-        Register("右键清除单锁", "Right-click to clear single lock");
-        Register("已锁定单路产物：{0}", "Locked output: {0}");
-        Register("已清除单路锁定", "Single lock cleared");
+        Register("交互模式", "Interaction mode"); Register("原料堆积", "Fluid overflow");
+        Register("搬运模式", "Transport mode"); Register("缺少精华", "Lack of fragments", "缺少残片");
+        Register("分馏永动", "Frac forever"); Register("无配方", "No recipe");
+        Register("主产物", "Main product"); Register("副产物", "Append product");
+        Register("流动", "Flow"); Register("损毁", "Destroy");
+        Register("流动输入", "Flow input"); Register("流动输出", "Flow output");
+        Register("配方强化", "Recipe enhancement"); Register("单锁", "Single Lock");
+        Register("单锁产物数目", "Single-lock output count"); Register("未锁定", "Not locked");
+        Register("右键设为单锁", "Right-click to lock this output"); Register("右键清除单锁", "Right-click to clear single lock");
+        Register("已锁定单路产物：{0}", "Locked output: {0}"); Register("已清除单路锁定", "Single lock cleared");
         Register("锁定产物无效，已清除", "Locked output invalid, cleared");
-        Register("调相方向", "Tuning target");
-        Register("右键设为调相方向", "Right-click to set tuning target");
-        Register("右键清除调相方向", "Right-click to clear tuning target");
-        Register("已设定调相方向：{0}", "Tuning target: {0}");
-        Register("已清除调相方向", "Tuning target cleared");
     }
 
     #region Field
 
-    /// <summary>
-    /// 定义单次更新最多尝试输出产物的次数。
-    /// </summary>
     public static int MaxOutputTimes = 2;
-    /// <summary>
-    /// 提供无产物状态下复用的空输出列表。
-    /// </summary>
     public static readonly List<ProductOutputInfo> emptyOutputs = [];
+    // ── 分馏处理核心常量 ──
+    private const float MinPowerForProcessing = 0.1f;       // 低于此功率不处理
+    private const float DefaultFluidInputPerCargo = 4f;      // 输入堆叠数未知时的兜底值
+    private const double BaseProgressRate = 500.0 / 3.0;    // 基础进度速率 / tick
+    private const double ProgressRoundUpBias = 0.75;         // 进度计算向上取整偏置
+    private const int MaxProgressValue = 300000;             // 进度上限
+    private const int ProgressPerBatch = 10000;              // 每批次消耗的进度
+    private const float FragmentDropRate = 0.02f;            // 残片掉落概率
+    // ──────────────────────────
     private const int ZeroPressureInternalStackCap = 8;
-    /// <summary>
-    /// 表示当前缓存包含主产物输出。
-    /// </summary>
     public const byte OutputFlagMain = 1 << 0;
-    /// <summary>
-    /// 表示当前缓存包含副产物输出。
-    /// </summary>
     public const byte OutputFlagSide = 1 << 1;
-    /// <summary>
-    /// 表示当前缓存包含流动物品输出。
-    /// </summary>
     public const byte OutputFlagFluid = 1 << 2;
-    /// <summary>
-    /// 累计分馏成功次数（用于任务系统）
-    /// </summary>
+    [ThreadStatic]
+    public static int CurrentRecipeProductId;
     public static long totalFractionSuccesses;
     private const int FractionRateWindowSeconds = 60;
     private static readonly long[] fractionSuccessBuckets = new long[FractionRateWindowSeconds];
     private static long currentFractionRateSecond = -1;
     private static long currentFractionSuccessesPerMinute;
-    /// <summary>
-    /// 记录当前存档历史峰值每分钟成功分馏次数。
-    /// </summary>
     public static long peakFractionSuccessesPerMinute;
 
-
-    /// <summary>
-    /// 读取分馏塔当前输出缓存包含的产物类型标记。
-    /// </summary>
-    public static byte GetCurrentOutputFlags(this FractionatorComponent fractionator,
-        PlanetFactory factory) {
-
+    public static byte GetCurrentOutputFlags(this FractionatorComponent fractionator, PlanetFactory factory) {
         if (factory == null) return 0;
         return fractionator.GetExtraState(factory).CurrentOutputFlags;
     }
 
     private static void SetCurrentOutputFlags(PlanetFactory factory,
-        FractionatorOutputState.FractionatorExtraState extraState,
-        bool main, bool side, bool fluid) {
-
+        FractionatorOutputState.FractionatorExtraState extraState, bool main, bool side, bool fluid) {
         if (factory == null) return;
         byte flags = 0;
-        if (main) flags |= OutputFlagMain;
-        if (side) flags |= OutputFlagSide;
-        if (fluid) flags |= OutputFlagFluid;
-        if (extraState.CurrentOutputFlags == flags) {
-            return;
-        }
+        if (main) flags |= OutputFlagMain; if (side) flags |= OutputFlagSide; if (fluid) flags |= OutputFlagFluid;
+        if (extraState.CurrentOutputFlags == flags) return;
         extraState.CurrentOutputFlags = flags;
     }
 
     #endregion
 
-
     #region 分馏塔处理逻辑
 
-    /// <summary>
-    /// 返回增产加成、加速加成中二者最大的值。
-    /// </summary>
     public static double MaxTableMilli(int fluidInputIncAvg) {
-        // 旧存档里可能留下负的增产点数，这里先把索引夹回合法范围，避免 UI 刷新直接越界崩溃。
         int avgPoint = Math.Max(0, Math.Min(fluidInputIncAvg, 10));
         double ratioAcc = Cargo.accTableMilli[avgPoint];
         double ratioInc = Cargo.incTableMilli[avgPoint] * incTableFixedRatio[avgPoint];
         return ratioAcc > ratioInc ? ratioAcc : ratioInc;
     }
 
-    /// <summary>
-    /// 修改分馏塔的运行逻辑。
-    /// </summary>
-    /// <remarks>
-    /// <para>注意：新增分馏塔产物输出使用Mod拓展存储。数据结构如下：</para>
-    /// <ul>
-    /// <li>int __instance.productId: 第一个主输出的ID，无用</li>
-    /// <li>int __instance.productOutputCount: 第一个主输出的数目，无用</li>
-    /// <li>int __instance.productOutputTotal: 第一个主输出的统计数目</li>
-    /// <li>List&lt;ProductOutputInfo&gt; __instance.productOutputs(factory): 存储所有产物输出</li>
-    /// </ul>
-    /// <para>除此之外，分馏判定结果由<see cref="FE.Logic.Fractionation.FracRecipes.BaseRecipe.GetOutputs"/>得到。</para>
-    /// </remarks>
-    /// <summary>
-    /// 在原版分馏器更新前分发到 FE 分馏塔热路径。
-    /// </summary>
     public static uint InternalUpdateWithModDispatch(ref FractionatorComponent fractionator,
         PlanetFactory factory, float power, SignData[] signPool, int[] productRegister, int[] consumeRegister) {
         long perfStart = GetFractionatorPerfTimestamp();
         int buildingID = factory.entityPool[fractionator.entityId].protoId;
-        int handlerIndex = FractionatorTowerCatalog.GetActiveFractionatorIndex(buildingID);
+        int handlerIndex = buildingID - IFE交互塔;
         if (handlerIndex >= 0 && handlerIndex < updateHandlersByBuildingOffset.Length) {
             try {
+                FracAffixManager.SetCurrentBuilding(factory.planetId, fractionator.id);
+                FracAffixManager.TryTriggerLightning(factory.planetId, fractionator.id);
                 uint result = 0;
                 updateHandlersByBuildingOffset[handlerIndex](ref fractionator, factory, power, signPool,
                     productRegister, consumeRegister, ref result);
+                if (result != 0) {
+                    if (productRegister[0] > 0) { CurrentRecipeProductId = productRegister[0]; FracAffixManager.LastFractionProductCount = productRegister[0]; }
+                    FracAffixManager.TickAffixes(factory.planetId, fractionator.id);
+                }
+                FracAffixManager.ClearCurrentBuilding();
                 return result;
-            }
-            finally {
+            } finally {
+                FracAffixManager.ClearCurrentBuilding();
                 RecordFractionatorPerf(FractionatorPerfUpdateFe, buildingID, GetFractionatorPerfElapsed(perfStart));
             }
         }
-
-        //原版分馏塔不做处理
-        try {
-            return fractionator.InternalUpdate(factory, power, signPool, productRegister, consumeRegister);
-        }
-        finally {
-            RecordFractionatorPerf(FractionatorPerfUpdateVanilla, buildingID, GetFractionatorPerfElapsed(perfStart));
-        }
+        try { return fractionator.InternalUpdate(factory, power, signPool, productRegister, consumeRegister); }
+        finally { RecordFractionatorPerf(FractionatorPerfUpdateVanilla, buildingID, GetFractionatorPerfElapsed(perfStart)); }
     }
 
-    private static void UpdateInteractionTower(ref FractionatorComponent fractionator,
-        PlanetFactory factory, float power, SignData[] signPool, int[] productRegister, int[] consumeRegister,
-        ref uint result) {
-        InternalUpdate<BuildingTrainRecipe>(ref fractionator, factory, power, signPool, productRegister,
-            consumeRegister, ref result, ERecipe.BuildingTrain);
-    }
+    private static void UpdateInteractionTower(ref FractionatorComponent f, PlanetFactory factory, float power, SignData[] signPool, int[] pr, int[] cr, ref uint r) => InternalUpdate<BuildingTrainRecipe>(ref f, factory, power, signPool, pr, cr, ref r, ERecipe.BuildingTrain);
+    private static void UpdateMineralReplicationTower(ref FractionatorComponent f, PlanetFactory factory, float power, SignData[] signPool, int[] pr, int[] cr, ref uint r) => InternalUpdate<MineralCopyRecipe>(ref f, factory, power, signPool, pr, cr, ref r, ERecipe.MineralCopy);
+    private static void UpdatePointAggregateTower(ref FractionatorComponent f, PlanetFactory factory, float power, SignData[] signPool, int[] pr, int[] cr, ref uint r) => InternalUpdate<PointAggregateRecipe>(ref f, factory, power, signPool, pr, cr, ref r, ERecipe.PointAggregate);
+    private static void UpdateConversionTower(ref FractionatorComponent f, PlanetFactory factory, float power, SignData[] signPool, int[] pr, int[] cr, ref uint r) => InternalUpdate<ConversionRecipe>(ref f, factory, power, signPool, pr, cr, ref r, ERecipe.Conversion);
+    private static void UpdateRectificationTower(ref FractionatorComponent f, PlanetFactory factory, float power, SignData[] signPool, int[] pr, int[] cr, ref uint r) => InternalUpdate<RectificationRecipe>(ref f, factory, power, signPool, pr, cr, ref r, ERecipe.Rectification);
 
-    private static void UpdateMineralReplicationTower(ref FractionatorComponent fractionator,
-        PlanetFactory factory, float power, SignData[] signPool, int[] productRegister, int[] consumeRegister,
-        ref uint result) {
-        InternalUpdate<MineralCopyRecipe>(ref fractionator, factory, power, signPool, productRegister,
-            consumeRegister, ref result, ERecipe.MineralCopy);
-    }
-
-    private static void UpdateConversionTower(ref FractionatorComponent fractionator,
-        PlanetFactory factory, float power, SignData[] signPool, int[] productRegister, int[] consumeRegister,
-        ref uint result) {
-        InternalUpdate<ConversionRecipe>(ref fractionator, factory, power, signPool, productRegister,
-            consumeRegister, ref result, ERecipe.Conversion);
-    }
-
-    private static void UpdateRectificationTower(ref FractionatorComponent fractionator,
-        PlanetFactory factory, float power, SignData[] signPool, int[] productRegister, int[] consumeRegister,
-        ref uint result) {
-        InternalUpdate<RectificationRecipe>(ref fractionator, factory, power, signPool, productRegister,
-            consumeRegister, ref result, ERecipe.Rectification);
-    }
-
-
-    /// <summary>
-    /// InternalUpdate的默认实现。
-    /// </summary>
     public static void InternalUpdate<T>(ref FractionatorComponent __instance,
         PlanetFactory factory, float power, SignData[] signPool, int[] productRegister, int[] consumeRegister,
         ref uint __result, ERecipe recipeType) where T : BaseRecipe {
@@ -224,107 +133,56 @@ public static partial class ProcessManager {
         int buildingID = factory.entityPool[entityId].protoId;
         bool isInteractionTower = buildingID == IFE交互塔;
         bool isMineralReplicationTower = buildingID == IFE矿物复制塔;
+        bool isPointAggregateTower = buildingID == IFE点数聚集塔;
         bool isConversionTower = buildingID == IFE转化塔;
-        bool isRectificationTower = buildingID == IFE精馏塔;
         bool enableMassEnergyFission = isMineralReplicationTower && MineralReplicationTower.EnableMassEnergyFission;
-        //所有产物输出
         FractionatorOutputState.FractionatorExtraState extraState = __instance.GetExtraState(factory);
         List<ProductOutputInfo> products = extraState.Products;
         ProductOutputBuffer outputBuffer = extraState.ScratchOutputs;
         int fluidId = __instance.fluidId;
         BaseRecipe recipe = extraState.GetRecipe(recipeType, fluidId);
-        RecordFractionatorPerfDetail(FractionatorPerfDetailPrepareStateRecipe,
-            GetFractionatorPerfElapsed(perfDetailStart));
+        RecordFractionatorPerfDetail(FractionatorPerfDetailPrepareStateRecipe, GetFractionatorPerfElapsed(perfDetailStart));
         perfDetailStart = GetFractionatorPerfTimestamp();
-        //检测products和recipe的输出是否一致
         ProductOutputInfo product0 = null;
         if (recipe == null) {
-            bool needResetProducts = !extraState.TryGetRuntimeSchema(recipeType, fluidId, null, __instance.productId,
-                                         out _)
-                                     || products.Count > 0
-                                     || __instance.productId != fluidId
-                                     || __instance.productOutputCount != 0;
-            if (needResetProducts) {
-                products.Clear();
-                extraState.InvalidateFullProductCache();
-                __instance.productId = fluidId;
-                __instance.productOutputCount = 0;
-                __instance.produceProb = 0.01f;
-                signPool[entityId].iconId0 = 0;
-                signPool[entityId].iconType = 0U;
+            bool needReset = !extraState.TryGetRuntimeSchema(recipeType, fluidId, null, __instance.productId, out _)
+                             || products.Count > 0 || __instance.productId != fluidId || __instance.productOutputCount != 0;
+            if (needReset) {
+                products.Clear(); extraState.InvalidateFullProductCache();
+                __instance.productId = fluidId; __instance.productOutputCount = 0; __instance.produceProb = 0.01f;
+                signPool[entityId].iconId0 = 0; signPool[entityId].iconType = 0U;
             }
-            if (isConversionTower) {
-                __instance.SetLockedOutput(factory,
-                    __instance.NormalizeLockedOutput(factory, __instance.GetLockedOutput(factory)));
-            }
-            if (isRectificationTower) {
-                __instance.SetTuningTarget(factory,
-                    __instance.NormalizeTuningTarget(factory, __instance.GetTuningTarget(factory)));
-            }
-            if (needResetProducts) {
-                extraState.MarkRuntimeSchema(recipeType, fluidId, null, __instance.productId, null);
-            }
-        } else if (!extraState.TryGetRuntimeSchema(recipeType, fluidId, recipe, __instance.productId,
-                       out product0)) {
-            int expectedProductCount = recipe.OutputMain.Count + recipe.OutputAppend.Count;
+            if (isConversionTower) __instance.SetLockedOutput(factory, __instance.NormalizeLockedOutput(factory, __instance.GetLockedOutput(factory)));
+            if (needReset) extraState.MarkRuntimeSchema(recipeType, fluidId, null, __instance.productId, null);
+        } else if (!extraState.TryGetRuntimeSchema(recipeType, fluidId, recipe, __instance.productId, out product0)) {
+            int expectedCount = recipe.OutputMain.Count + recipe.OutputAppend.Count;
             int firstProductId = recipe.OutputMain.Count > 0 ? recipe.OutputMain[0].OutputID : recipe.InputID;
-            bool needResetProducts = __instance.productId != firstProductId
-                                     || products.Count != expectedProductCount
-                                     || !MatchesRecipeOutputs(products, recipe);
-            if (needResetProducts) {
-                products.Clear();
-                extraState.InvalidateFullProductCache();
-                __instance.productId = firstProductId;
-                __instance.productOutputCount = 0;
-                __instance.produceProb = 0.01f;
-                signPool[entityId].iconId0 = (uint)__instance.fluidId;
-                signPool[entityId].iconType = 1U;
-                foreach (OutputInfo info in recipe.OutputMain) {
-                    products.Add(new(true, info.OutputID, 0));
-                }
-                foreach (OutputInfo info in recipe.OutputAppend) {
-                    products.Add(new(false, info.OutputID, 0));
-                }
-                // C8: 单路锁定 - 配方变化时按新配方校验，兼容复制粘贴/蓝图带过来的预设锁定。
-                if (isConversionTower) {
-                    __instance.SetLockedOutput(factory,
-                        __instance.NormalizeLockedOutput(factory, __instance.GetLockedOutput(factory)));
-                }
-                if (isRectificationTower) {
-                    __instance.SetTuningTarget(factory,
-                        __instance.NormalizeTuningTarget(factory, __instance.GetTuningTarget(factory)));
-                }
+            bool needReset = __instance.productId != firstProductId || products.Count != expectedCount || !MatchesRecipeOutputs(products, recipe);
+            if (needReset) {
+                products.Clear(); extraState.InvalidateFullProductCache();
+                __instance.productId = firstProductId; __instance.productOutputCount = 0; __instance.produceProb = 0.01f;
+                signPool[entityId].iconId0 = (uint)__instance.fluidId; signPool[entityId].iconType = 1U;
+                foreach (var info in recipe.OutputMain) products.Add(new(true, info.OutputID, 0));
+                foreach (var info in recipe.OutputAppend) products.Add(new(false, info.OutputID, 0));
+                if (isConversionTower) __instance.SetLockedOutput(factory, __instance.NormalizeLockedOutput(factory, __instance.GetLockedOutput(factory)));
             }
-            int productId = __instance.productId;
-            product0 = products.Count > 0 && products[0].itemId == productId
-                ? products[0]
-                : FindProduct(products, productId);
-            extraState.MarkRuntimeSchema(recipeType, fluidId, recipe, productId, product0);
+            int pid = __instance.productId;
+            product0 = products.Count > 0 && products[0].itemId == pid ? products[0] : FindProduct(products, pid);
+            extraState.MarkRuntimeSchema(recipeType, fluidId, recipe, pid, product0);
         }
         RecordFractionatorPerfDetail(FractionatorPerfDetailPrepareSchema, GetFractionatorPerfElapsed(perfDetailStart));
         perfDetailStart = GetFractionatorPerfTimestamp();
-        //第一个主输出，recipe有则必定有，recipe没有则必定没有
         int product0Id = __instance.productId;
-        //如果通过面板取了物品，需要同步数目到products
         if (product0 != null && product0.count != __instance.productOutputCount) {
-            product0.count = __instance.productOutputCount;
-            extraState.InvalidateFullProductCache();
+            product0.count = __instance.productOutputCount; extraState.InvalidateFullProductCache();
         }
         RecordFractionatorPerfDetail(FractionatorPerfDetailPrepareProduct, GetFractionatorPerfElapsed(perfDetailStart));
-        if (power < 0.1) {
-            __result = 0;
-            RecordFractionatorPerfStage(FractionatorPerfStagePrepare, GetFractionatorPerfElapsed(perfStageStart));
-            return;
-        }
+        if (power < MinPowerForProcessing) { __result = 0; RecordFractionatorPerfStage(FractionatorPerfStagePrepare, GetFractionatorPerfElapsed(perfStageStart)); return; }
         perfDetailStart = GetFractionatorPerfTimestamp();
         long perfConfigStart = perfDetailStart;
         float fluidInputCountPerCargo = 1.0f;
-        if (__instance.fluidInputCount == 0)
-            __instance.fluidInputCargoCount = 0f;
-        else
-            fluidInputCountPerCargo = __instance.fluidInputCargoCount > 0.0001
-                ? __instance.fluidInputCount / __instance.fluidInputCargoCount
-                : 4f;
+        if (__instance.fluidInputCount == 0) __instance.fluidInputCargoCount = 0f;
+        else fluidInputCountPerCargo = __instance.fluidInputCargoCount > 0.0001 ? __instance.fluidInputCount / __instance.fluidInputCargoCount : DefaultFluidInputPerCargo;
         FractionatorRuntimeConfig runtimeConfig = GetRuntimeConfig(buildingID);
         int maxStack = runtimeConfig.MaxStack;
         float plrRatio = runtimeConfig.PlrRatio;
@@ -333,280 +191,153 @@ public static partial class ProcessManager {
         int fluidInputCargoMax = BaseFracFluidInputCargoMax;
         int productOutputMax = runtimeConfig.ProductOutputMax;
         int fluidOutputMax = runtimeConfig.FluidOutputMax;
-        bool canProcessRecipe = recipe != null && RecipeGrowthQueries.IsUnlocked(recipe);
-        bool moveDirectly = !canProcessRecipe;
+        bool moveDirectly = recipe == null || !RecipeGrowthQueries.IsUnlocked(recipe);
         RecipeGrowthContext growthContext = default;
         bool growthContextReady = false;
-        bool producedMainThisTick = false;
-        bool producedSideThisTick = false;
-        bool producedFluidThisTick = false;
+        bool producedMainThisTick = false, producedSideThisTick = false, producedFluidThisTick = false;
         bool hasFullProduct = extraState.HasFullProduct(productOutputMax);
         bool needRecheckFullProduct = false;
-        int consumedInputThisTick = 0;
-        int successCountThisTick = 0;
-        int fragmentRewardThisTick = 0;
+        int consumedInputThisTick = 0, successCountThisTick = 0, fragmentRewardThisTick = 0;
         List<ProductOutputInfo> productRegisterDeltas = null;
         RecordFractionatorPerfDetail(FractionatorPerfDetailPrepareConfig, GetFractionatorPerfElapsed(perfConfigStart));
         RecordFractionatorPerfStage(FractionatorPerfStagePrepare, GetFractionatorPerfElapsed(perfStageStart));
-        perfStageStart = GetFractionatorPerfTimestamp();
-        perfDetailStart = perfStageStart;
-        if (__instance.fluidInputCount > 0
-            && (!hasFullProduct || enableFracForever)
-            && __instance.fluidOutputCount < fluidOutputMax) {
-            //分馏塔正常运转时，计算进度，10000点进度可以处理一次
-            __instance.progress += (int)(power
-                                         * (500.0 / 3.0)
-                                         * (__instance.fluidInputCargoCount < MaxBeltSpeed
-                                             ? __instance.fluidInputCargoCount
-                                             : MaxBeltSpeed)
-                                         * fluidInputCountPerCargo
-                                         + 0.75);
-            if (__instance.progress > 300000) {
-                __instance.progress = 300000;
-            }
-            // 质能裂变 - 矿物复制塔在 Level >= 6 时，维持池中点数在目标值以上；
-            // 当池量不足时，批量消耗原料填满点数池（每个原料+25点，零压循环激活时+50点）。
-            // 取用时：若平均增产点数不足10，从池中补足至10。
-            if (enableMassEnergyFission && canProcessRecipe && __instance.fluidInputCount > 0) {
+        perfStageStart = GetFractionatorPerfTimestamp(); perfDetailStart = perfStageStart;
+        if (__instance.fluidInputCount > 0 && (!hasFullProduct || enableFracForever) && __instance.fluidOutputCount < fluidOutputMax) {
+            __instance.progress += (int)(power * BaseProgressRate * (__instance.fluidInputCargoCount < MaxBeltSpeed ? __instance.fluidInputCargoCount : MaxBeltSpeed) * fluidInputCountPerCargo + ProgressRoundUpBias);
+            if (__instance.progress > MaxProgressValue) __instance.progress = MaxProgressValue;
+            if (isPointAggregateTower && PointAggregateTower.EnableVoidSpray) AddIncToItem(__instance.fluidInputCount, ref __instance.fluidInputInc);
+            if (enableMassEnergyFission && __instance.fluidInputCount > 0) {
                 int pointsPerItem = MineralReplicationTower.EnableZeroPressureCycle ? 40 : 25;
                 int poolTarget = __instance.fluidInputCount * 15;
                 int pool = __instance.GetFissionPointPool(factory);
-                // 池量不足时批量消耗原料补满
                 if (pool <= 0) {
-                    int pointsNeeded = poolTarget - pool;
-                    int itemsToConsume = (pointsNeeded + pointsPerItem - 1) / pointsPerItem;// 向上取整
-                    int itemsAvail = __instance.fluidInputCount;
-                    int itemsConsumed = Math.Min(itemsToConsume, itemsAvail);
-                    if (itemsConsumed > 0) {
-                        int incAvgForConsume = __instance.fluidInputInc > 0 && __instance.fluidInputCount > 0
-                            ? __instance.fluidInputInc / __instance.fluidInputCount
-                            : 0;
-                        __instance.fluidInputCount -= itemsConsumed;
-                        if (__instance.fluidInputCount < 0) __instance.fluidInputCount = 0;
-                        __instance.fluidInputCargoCount -= (float)itemsConsumed / fluidInputCountPerCargo;
-                        if (__instance.fluidInputCargoCount < 0f) __instance.fluidInputCargoCount = 0f;
-                        __instance.fluidInputInc -= incAvgForConsume * itemsConsumed;
-                        if (__instance.fluidInputInc < 0) __instance.fluidInputInc = 0;
-                        pool += itemsConsumed * pointsPerItem;
-                        __instance.SetFissionPointPool(factory, pool);
+                    int needed = poolTarget - pool;
+                    int toConsume = (needed + pointsPerItem - 1) / pointsPerItem;
+                    int avail = __instance.fluidInputCount;
+                    int consumed = Math.Min(toConsume, avail);
+                    if (consumed > 0) {
+                        int avgInc = __instance.fluidInputInc > 0 && __instance.fluidInputCount > 0 ? __instance.fluidInputInc / __instance.fluidInputCount : 0;
+                        __instance.fluidInputCount -= consumed; if (__instance.fluidInputCount < 0) __instance.fluidInputCount = 0;
+                        __instance.fluidInputCargoCount -= (float)consumed / fluidInputCountPerCargo; if (__instance.fluidInputCargoCount < 0f) __instance.fluidInputCargoCount = 0f;
+                        __instance.fluidInputInc -= avgInc * consumed; if (__instance.fluidInputInc < 0) __instance.fluidInputInc = 0;
+                        pool += consumed * pointsPerItem; __instance.SetFissionPointPool(factory, pool);
                     }
                 }
-                // 取用：若输入平均点数不足10，从池中补足
                 if (__instance.fluidInputCount > 0) {
                     int avgInc = __instance.fluidInputInc / __instance.fluidInputCount;
                     if (avgInc < 10) {
-                        int needed = (10 - avgInc) * __instance.fluidInputCount;
-                        int toUse = Math.Min(pool, needed);
-                        if (toUse > 0) {
-                            __instance.fluidInputInc += toUse;
-                            pool -= toUse;
-                            __instance.SetFissionPointPool(factory, pool);
-                        }
+                        int toUse = Math.Min(pool, (10 - avgInc) * __instance.fluidInputCount);
+                        if (toUse > 0) { __instance.fluidInputInc += toUse; pool -= toUse; __instance.SetFissionPointPool(factory, pool); }
                     }
                 }
             }
-            int batchCount = Math.Min(__instance.progress / 10000, __instance.fluidInputCount);
+            int batchCount = Math.Min(__instance.progress / ProgressPerBatch, __instance.fluidInputCount);
             if (batchCount > 0) {
-                __instance.progress -= batchCount * 10000;
-                int fluidInputIncAvg = __instance.fluidInputInc <= 0 || __instance.fluidInputCount <= 0
-                    ? 0
-                    : __instance.fluidInputInc / __instance.fluidInputCount;
-                if (!__instance.incUsed)
-                    __instance.incUsed = fluidInputIncAvg > 0;
-
-                // 判断是否直通（永动且满了，或者无配方/配方锁定）
-                bool isForcedPassthrough =
-                    moveDirectly || (enableFracForever && hasFullProduct);
+                __instance.progress -= batchCount * ProgressPerBatch;
+                int fluidInputIncAvg = __instance.fluidInputInc <= 0 || __instance.fluidInputCount <= 0 ? 0 : __instance.fluidInputInc / __instance.fluidInputCount;
+                if (!__instance.incUsed) __instance.incUsed = fluidInputIncAvg > 0;
+                bool isForcedPassthrough = moveDirectly || (enableFracForever && hasFullProduct);
+                bool quantumTunnel = !isForcedPassthrough && FracAffixManager.CheckQuantumTunnel(factory.planetId, __instance.id);
                 FractionationBatchResult batchResult;
                 if (isForcedPassthrough) {
                     outputBuffer.Clear();
-                    batchResult = new FractionationBatchResult {
-                        InputRemoveCount = batchCount,
-                        ConsumedRegisterCount = 0,
-                        SuccessCount = 0,
-                        DestroyedCount = 0,
-                        PassThroughCount = batchCount,
-                        PassThroughInc = fluidInputIncAvg * batchCount,
-                    };
-                    __instance.fluidInputInc -= fluidInputIncAvg * batchCount;
-                    if (__instance.fluidInputInc < 0) __instance.fluidInputInc = 0;
+                    batchResult = new FractionationBatchResult { InputRemoveCount = batchCount, ConsumedRegisterCount = 0, SuccessCount = 0, DestroyedCount = 0, PassThroughCount = batchCount };
+                    __instance.fluidInputInc -= fluidInputIncAvg * batchCount; if (__instance.fluidInputInc < 0) __instance.fluidInputInc = 0;
+                } else if (quantumTunnel) {
+                    outputBuffer.Clear();
+                    var mainOutput = recipe.OutputMain[0];
+                    int baseCount = (int)mainOutput.OutputCount;
+                    float fractional = mainOutput.OutputCount - baseCount;
+                    int totalCount = BaseRecipe.RollBinomialApprox(ref __instance.seed, batchCount, fractional) + batchCount * baseCount;
+                    if (totalCount > 0) { outputBuffer.Add(true, mainOutput.OutputID, totalCount); mainOutput.OutputTotalCount += totalCount; }
+                    batchResult = new FractionationBatchResult { InputRemoveCount = batchCount, ConsumedRegisterCount = batchCount, SuccessCount = batchCount, DestroyedCount = 0, PassThroughCount = 0 };
+                    __instance.fluidInputInc -= fluidInputIncAvg * batchCount; if (__instance.fluidInputInc < 0) __instance.fluidInputInc = 0;
                 } else {
                     float pointsBonus = (float)MaxTableMilli(fluidInputIncAvg) * plrRatio;
                     float successBoost = buildingSuccessBoost + Achievements.GetSuccessRateBonus();
-                    // C8: 单路锁定 - 在调用 GetOutputs 前设置当前锁定产物ID
-                    if (isConversionTower) {
-                        ConversionRecipe.CurrentLockedOutputId = __instance.GetLockedOutput(factory);
-                    }
-                    if (isRectificationTower) {
-                        RectificationRecipe.CurrentTuningTargetId = __instance.GetNormalizedTuningTarget(factory);
-                    }
+                    if (isConversionTower) ConversionRecipe.CurrentLockedOutputId = __instance.GetLockedOutput(factory);
                     perfDetailStart = GetFractionatorPerfTimestamp();
                     try {
-                        batchResult = recipe.GetOutputsBatchFast(ref __instance.seed, pointsBonus, successBoost,
-                            batchCount, fluidInputIncAvg, ref __instance.fluidInputInc, outputBuffer);
-                    }
-                    finally {
-                        if (isConversionTower) {
-                            ConversionRecipe.CurrentLockedOutputId = 0;
-                        }
-                        if (isRectificationTower) {
-                            RectificationRecipe.CurrentTuningTargetId = 0;
-                        }
-                    }
-                    RecordFractionatorPerfDetail(FractionatorPerfDetailProcessGetOutputs,
-                        GetFractionatorPerfElapsed(perfDetailStart));
+                        FracAffixManager.SetSchrödingerIfActive(factory.planetId, __instance.id);
+                        batchResult = recipe.GetOutputsBatchFast(ref __instance.seed, pointsBonus, successBoost, batchCount, fluidInputIncAvg, ref __instance.fluidInputInc, outputBuffer);
+                    } finally { if (isConversionTower) ConversionRecipe.CurrentLockedOutputId = 0; }
+                    RecordFractionatorPerfDetail(FractionatorPerfDetailProcessGetOutputs, GetFractionatorPerfElapsed(perfDetailStart));
                 }
-
-                // 因果溯源 - 转化塔在 Level >= 6 时，50%概率让损毁不消耗原料。
                 if (isConversionTower && ConversionTower.EnableCausalTracing && batchResult.DestroyedCount > 0) {
-                    int savedDestroyed = BaseRecipe.RollBinomialApprox(ref __instance.seed,
-                        batchResult.DestroyedCount, 0.5f);
-                    if (savedDestroyed > 0) {
-                        batchResult.InputRemoveCount -= savedDestroyed;
-                        batchResult.ConsumedRegisterCount -= savedDestroyed;
-                        __instance.fluidInputInc += fluidInputIncAvg * savedDestroyed;
-                    }
+                    int saved = BaseRecipe.RollBinomialApprox(ref __instance.seed, batchResult.DestroyedCount, 0.5f);
+                    if (saved > 0) { batchResult.InputRemoveCount -= saved; batchResult.ConsumedRegisterCount -= saved; __instance.fluidInputInc += fluidInputIncAvg * saved; }
                 }
-
                 __instance.fractionSuccess = batchResult.HasOutput;
-
                 if (batchResult.InputRemoveCount > 0) {
-                    __instance.fluidInputCount -= batchResult.InputRemoveCount;
-                    if (__instance.fluidInputCount < 0) __instance.fluidInputCount = 0;
-                    if (__instance.fluidInputCount == 0) __instance.fluidInputInc = 0;
-                    __instance.fluidInputCargoCount -= batchResult.InputRemoveCount / fluidInputCountPerCargo;
-                    if (__instance.fluidInputCargoCount < 0f) __instance.fluidInputCargoCount = 0f;
+                    __instance.fluidInputCount -= batchResult.InputRemoveCount; if (__instance.fluidInputCount < 0) __instance.fluidInputCount = 0;
+                    __instance.fluidInputCargoCount -= batchResult.InputRemoveCount / fluidInputCountPerCargo; if (__instance.fluidInputCargoCount < 0f) __instance.fluidInputCargoCount = 0f;
                 }
-
                 if (batchResult.PassThroughCount > 0) {
-                    __instance.fluidOutputCount += batchResult.PassThroughCount;
-                    __instance.fluidOutputTotal += batchResult.PassThroughCount;
-                    __instance.fluidOutputInc += batchResult.PassThroughInc;
-                    producedFluidThisTick = true;
+                    __instance.fluidOutputCount += batchResult.PassThroughCount; __instance.fluidOutputTotal += batchResult.PassThroughCount;
+                    __instance.fluidOutputInc += fluidInputIncAvg * batchResult.PassThroughCount; producedFluidThisTick = true;
                 }
-
                 if (batchResult.SuccessCount > 0) {
                     perfDetailStart = GetFractionatorPerfTimestamp();
                     successCountThisTick += batchResult.SuccessCount;
                     __instance.productOutputTotal += batchResult.SuccessCount;
                     for (int i = 0; i < outputBuffer.Count; i++) {
-                        ProductOutputInfo p = outputBuffer[i];
-                        int itemID = p.itemId;
-                        int itemCount = p.count;
-                        if (p.isMainOutput) producedMainThisTick = true;
-                        else producedSideThisTick = true;
+                        var p = outputBuffer[i];
+                        int itemID = p.itemId, itemCount = p.count;
+                        if (p.isMainOutput) producedMainThisTick = true; else producedSideThisTick = true;
                         AddProductRegisterDelta(ref productRegisterDeltas, itemID, itemCount);
                         if (itemID == product0Id) {
-                            product0.count += itemCount;
-                            __instance.productOutputCount = product0.count;
-                            NotifyProductCountIncreased(extraState, product0.count, productOutputMax,
-                                ref hasFullProduct);
-                        } else {
-                            ProductOutputInfo target = FindProduct(products, itemID);
-                            if (target != null) {
-                                target.count += itemCount;
-                                NotifyProductCountIncreased(extraState, target.count, productOutputMax,
-                                    ref hasFullProduct);
+                            if (product0 != null) {
+                                product0.count += itemCount; __instance.productOutputCount = product0.count;
+                                NotifyProductCountIncreased(extraState, product0.count, productOutputMax, ref hasFullProduct);
                             } else {
-                                products.Add(new ProductOutputInfo(p.isMainOutput, itemID, itemCount));
-                                NotifyProductCountIncreased(extraState, itemCount, productOutputMax,
-                                    ref hasFullProduct);
+                                var fb = FindProduct(products, itemID);
+                                if (fb != null) { fb.count += itemCount; NotifyProductCountIncreased(extraState, fb.count, productOutputMax, ref hasFullProduct); }
+                                else { products.Add(new ProductOutputInfo(p.isMainOutput, itemID, itemCount)); NotifyProductCountIncreased(extraState, itemCount, productOutputMax, ref hasFullProduct); }
                             }
+                        } else {
+                            var target = FindProduct(products, itemID);
+                            if (target != null) { target.count += itemCount; NotifyProductCountIncreased(extraState, target.count, productOutputMax, ref hasFullProduct); }
+                            else { products.Add(new ProductOutputInfo(p.isMainOutput, itemID, itemCount)); NotifyProductCountIncreased(extraState, itemCount, productOutputMax, ref hasFullProduct); }
                         }
                     }
-                    RecordFractionatorPerfDetail(FractionatorPerfDetailProcessMergeOutputs,
-                        GetFractionatorPerfElapsed(perfDetailStart));
-                    fragmentRewardThisTick += BaseRecipe.RollBinomialApprox(ref __instance.seed,
-                        batchResult.SuccessCount, 0.02f);
+                    RecordFractionatorPerfDetail(FractionatorPerfDetailProcessMergeOutputs, GetFractionatorPerfElapsed(perfDetailStart));
+                    fragmentRewardThisTick += BaseRecipe.RollBinomialApprox(ref __instance.seed, batchResult.SuccessCount, FragmentDropRate);
                 }
-
                 consumedInputThisTick += batchResult.ConsumedRegisterCount;
             }
-        } else {
-            __instance.fractionSuccess = false;
-        }
+        } else __instance.fractionSuccess = false;
 
         RecordFractionatorPerfStage(FractionatorPerfStageProcess, GetFractionatorPerfElapsed(perfStageStart));
-        perfStageStart = GetFractionatorPerfTimestamp();
-        perfDetailStart = GetFractionatorPerfTimestamp();
+        perfStageStart = GetFractionatorPerfTimestamp(); perfDetailStart = perfStageStart;
         FlushProcessingDeltas(recipe, buildingID, fluidId, consumedInputThisTick, successCountThisTick,
-            fragmentRewardThisTick, productRegisterDeltas, productRegister, consumeRegister, ref growthContext,
-            ref growthContextReady);
+            fragmentRewardThisTick, productRegisterDeltas, productRegister, consumeRegister, ref growthContext, ref growthContextReady);
         RecordFractionatorPerfDetail(FractionatorPerfDetailFlushDeltas, GetFractionatorPerfElapsed(perfDetailStart));
-
-        SetCurrentOutputFlags(factory,
-            extraState,
-            producedMainThisTick, producedSideThisTick, producedFluidThisTick);
-
+        SetCurrentOutputFlags(factory, extraState, producedMainThisTick, producedSideThisTick, producedFluidThisTick);
         RecordFractionatorPerfStage(FractionatorPerfStageFlushDeltas, GetFractionatorPerfElapsed(perfStageStart));
         perfStageStart = GetFractionatorPerfTimestamp();
-        // 零压循环 - 矿物复制塔在 Level >= 12 时，将产物和流动输出回流到输入
-        if (isMineralReplicationTower
-            && MineralReplicationTower.EnableZeroPressureCycle
-            && canProcessRecipe) {
-            // 12 级仍然允许自循环，但内循环缓冲只按 8-stack 设计，避免完全替代外部物流与供料。
-            int zeroPressureStack = Math.Min(MineralReplicationTower.MaxStack, ZeroPressureInternalStackCap);
-            int fluidInputTarget = MaxBeltSpeed * zeroPressureStack;
-            int fluidOutputTarget = 2 * zeroPressureStack;
-            bool hasFluidOutputBelt = __instance.belt1 > 0 && __instance.isOutput1
-                                      || __instance.belt2 > 0 && __instance.isOutput2;
 
-            // 步骤1：无流动输出带时，先用流动输出回补输入，避免自循环被外部输出抢走。
-            if (!hasFluidOutputBelt) {
-                int needForInput = Math.Max(0, fluidInputTarget - __instance.fluidInputCount);
-                int fluidMoveCount = Math.Min(__instance.fluidOutputCount, needForInput);
-                if (fluidMoveCount > 0) {
-                    int fluidOutputIncAvg = __instance.fluidOutputCount > 0
-                        ? __instance.fluidOutputInc / __instance.fluidOutputCount
-                        : 0;
-                    int moveInc = fluidOutputIncAvg * fluidMoveCount;
-                    __instance.fluidInputCount += fluidMoveCount;
-                    __instance.fluidInputCargoCount = Math.Min(fluidInputCargoMax,
-                        __instance.fluidInputCargoCount + (float)fluidMoveCount / fluidInputCountPerCargo);
-                    __instance.fluidInputInc += moveInc;
-                    __instance.fluidOutputCount -= fluidMoveCount;
-                    __instance.fluidOutputInc -= moveInc;
+        // 零压循环
+        if (isMineralReplicationTower && MineralReplicationTower.EnableZeroPressureCycle) {
+            int zpStack = Math.Min(MineralReplicationTower.MaxStack, ZeroPressureInternalStackCap);
+            int fiTarget = MaxBeltSpeed * zpStack, foTarget = 2 * zpStack;
+            bool hasFoBelt = __instance.belt1 > 0 && __instance.isOutput1 || __instance.belt2 > 0 && __instance.isOutput2;
+            if (!hasFoBelt) {
+                int moveCount = Math.Max(0, __instance.fluidOutputCount - foTarget);
+                if (moveCount > 0) {
+                    int avgInc = __instance.fluidOutputCount > 0 ? __instance.fluidOutputInc / __instance.fluidOutputCount : 0;
+                    __instance.fluidInputCount += moveCount; __instance.fluidInputCargoCount = Math.Min(fluidInputCargoMax, __instance.fluidInputCargoCount + (float)moveCount / fluidInputCountPerCargo);
+                    __instance.fluidInputInc += avgInc * moveCount; __instance.fluidOutputCount -= moveCount; __instance.fluidOutputInc -= avgInc;
                 }
             }
-
-            // 步骤2 & 3：复制产物先补 fluidInput，再补 fluidOutput；剩余产物才允许外部输出。
             if (recipe != null) {
-                ProductOutputInfo mainProduct = FindProduct(products, fluidId, mainOnly: true);
+                var mainProduct = FindProduct(products, fluidId, true);
                 if (mainProduct != null && mainProduct.count > 0) {
-                    int productIncPerItem = recipe.GetOutputInc(fluidId);
-
-                    // 步骤2：优先补 fluidInput 到自循环目标。
-                    int needForInput = Math.Max(0, fluidInputTarget - __instance.fluidInputCount);
-                    int moveToInput = Math.Min(mainProduct.count, needForInput);
-                    if (moveToInput > 0) {
-                        __instance.fluidInputCount += moveToInput;
-                        __instance.fluidInputCargoCount = Math.Min(fluidInputCargoMax,
-                            __instance.fluidInputCargoCount + (float)moveToInput / fluidInputCountPerCargo);
-                        __instance.fluidInputInc += productIncPerItem * moveToInput;
-                        mainProduct.count -= moveToInput;
-                        extraState.InvalidateFullProductCache();
-                        needRecheckFullProduct = needRecheckFullProduct
-                                                 || hasFullProduct && mainProduct.count < productOutputMax;
-                        if (mainProduct.itemId == product0Id) {
-                            __instance.productOutputCount = mainProduct.count;
-                        }
-                    }
-
-                    // 步骤3：输入目标满足后，再补 fluidOutput 到内部流动缓冲。
+                    int incPer = recipe.GetOutputInc(fluidId);
+                    int toOut = Math.Min(mainProduct.count, Math.Max(0, foTarget - __instance.fluidOutputCount));
+                    if (toOut > 0) { __instance.fluidOutputCount += toOut; __instance.fluidOutputInc += incPer * toOut; mainProduct.count -= toOut; extraState.InvalidateFullProductCache(); needRecheckFullProduct = needRecheckFullProduct || hasFullProduct && mainProduct.count < productOutputMax; if (mainProduct.itemId == product0Id) __instance.productOutputCount = mainProduct.count; }
                     if (mainProduct.count > 0) {
-                        int needForOutput = Math.Max(0, fluidOutputTarget - __instance.fluidOutputCount);
-                        int moveToOutput = Math.Min(mainProduct.count, needForOutput);
-                        if (moveToOutput > 0) {
-                            __instance.fluidOutputCount += moveToOutput;
-                            __instance.fluidOutputInc += productIncPerItem * moveToOutput;
-                            mainProduct.count -= moveToOutput;
-                            extraState.InvalidateFullProductCache();
-                            needRecheckFullProduct = needRecheckFullProduct
-                                                     || hasFullProduct && mainProduct.count < productOutputMax;
-                            if (mainProduct.itemId == product0Id) {
-                                __instance.productOutputCount = mainProduct.count;
-                            }
-                        }
+                        int toIn = Math.Min(mainProduct.count, Math.Max(0, fiTarget - __instance.fluidInputCount));
+                        if (toIn > 0) { __instance.fluidInputCount += toIn; __instance.fluidInputCargoCount = Math.Min(fluidInputCargoMax, __instance.fluidInputCargoCount + (float)toIn / fluidInputCountPerCargo); __instance.fluidInputInc += incPer * toIn; mainProduct.count -= toIn; extraState.InvalidateFullProductCache(); needRecheckFullProduct = needRecheckFullProduct || hasFullProduct && mainProduct.count < productOutputMax; if (mainProduct.itemId == product0Id) __instance.productOutputCount = mainProduct.count; }
                     }
                 }
             }
@@ -614,125 +345,30 @@ public static partial class ProcessManager {
         RecordFractionatorPerfStage(FractionatorPerfStageZeroPressure, GetFractionatorPerfElapsed(perfStageStart));
         perfStageStart = GetFractionatorPerfTimestamp();
         CargoTraffic cargoTraffic = factory.cargoTraffic;
-        byte stack;
-        byte inc;
+        // belt1
         if (__instance.belt1 > 0) {
-            if (__instance.isOutput1) {
-                TryOutputFluidToBelt(ref __instance, buildingID, enableFracForever && !moveDirectly, maxStack,
-                    cargoTraffic, __instance.belt1, fluidInputCountPerCargo, forceSingleStack: moveDirectly);
-            } else if (!__instance.isOutput1 && __instance.fluidInputCargoCount < fluidInputCargoMax) {
-                if (fluidId > 0) {
-                    for (int i = 0; i < MaxOutputTimes && __instance.fluidInputCargoCount < fluidInputCargoMax; i++) {
-                        if (cargoTraffic.TryPickItemAtRear(__instance.belt1, fluidId, null, out stack, out inc) > 0) {
-                            __instance.fluidInputCount += stack;
-                            __instance.fluidInputInc += inc;
-                            __instance.fluidInputCargoCount++;
-                        } else {
-                            break;
-                        }
-                    }
-                } else {
-                    int needId = cargoTraffic.TryPickItemAtRear(__instance.belt1, 0, null, out stack, out inc);
-                    if (needId > 0) {
-                        __instance.fluidInputCount += stack;
-                        __instance.fluidInputInc += inc;
-                        __instance.fluidInputCargoCount++;
-                        __instance.fluidId = needId;
-                        recipe = extraState.GetRecipe(recipeType, needId);
-                        if (recipe == null) {
-                            __instance.productId = needId;
-                            __instance.produceProb = 0.01f;
-                            signPool[entityId].iconId0 = 0;
-                            signPool[entityId].iconType = 0U;
-                        } else {
-                            __instance.productId = recipe.OutputMain.Count > 0
-                                ? recipe.OutputMain[0].OutputID
-                                : recipe.InputID;
-                            __instance.produceProb = 0.01f;
-                            signPool[entityId].iconId0 = (uint)__instance.fluidId;
-                            signPool[entityId].iconType = 1U;
-                            foreach (OutputInfo info in recipe.OutputMain) {
-                                products.Add(new(true, info.OutputID, 0));
-                            }
-                            foreach (OutputInfo info in recipe.OutputAppend) {
-                                products.Add(new(false, info.OutputID, 0));
-                            }
-                            extraState.InvalidateFullProductCache();
-                        }
-                        // 初始拾取一个后，尝试继续拾取同类物品以快速填满
-                        for (int i = 1;
-                             i < MaxOutputTimes && __instance.fluidInputCargoCount < fluidInputCargoMax;
-                             i++) {
-                            if (cargoTraffic.TryPickItemAtRear(__instance.belt1, needId, null, out stack, out inc)
-                                > 0) {
-                                __instance.fluidInputCount += stack;
-                                __instance.fluidInputInc += inc;
-                                __instance.fluidInputCargoCount++;
-                            } else {
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
+            if (__instance.isOutput1) ProcessBeltOutputFluid(ref __instance, __instance.belt1, buildingID, enableFracForever, maxStack, cargoTraffic, fluidInputCountPerCargo);
+            else ProcessBeltInput(ref __instance, __instance.belt1, factory, cargoTraffic, fluidInputCountPerCargo, fluidInputCargoMax, MaxOutputTimes, ref fluidId, ref recipe, ref products, ref extraState, recipeType, entityId, signPool);
         }
+        // belt2
         if (__instance.belt2 > 0) {
-            if (__instance.isOutput2) {
-                TryOutputFluidToBelt(ref __instance, buildingID, enableFracForever && !moveDirectly, maxStack,
-                    cargoTraffic, __instance.belt2, fluidInputCountPerCargo, forceSingleStack: moveDirectly);
-            } else if (!__instance.isOutput2 && __instance.fluidInputCargoCount < fluidInputCargoMax) {
-                if (fluidId > 0) {
-                    for (int i = 0; i < MaxOutputTimes && __instance.fluidInputCargoCount < fluidInputCargoMax; i++) {
-                        if (cargoTraffic.TryPickItemAtRear(__instance.belt2, fluidId, null, out stack, out inc) > 0) {
-                            __instance.fluidInputCount += stack;
-                            __instance.fluidInputInc += inc;
-                            __instance.fluidInputCargoCount++;
-                        } else {
-                            break;
-                        }
-                    }
-                } else {
-                    int needId = cargoTraffic.TryPickItemAtRear(__instance.belt2, 0, null, out stack, out inc);
-                    if (needId > 0) {
-                        __instance.fluidInputCount += stack;
-                        __instance.fluidInputInc += inc;
-                        __instance.fluidInputCargoCount++;
-                        __instance.fluidId = needId;
-                        recipe = extraState.GetRecipe(recipeType, needId);
-                        if (recipe == null) {
-                            __instance.productId = needId;
-                            __instance.produceProb = 0.01f;
-                            signPool[entityId].iconId0 = 0;
-                            signPool[entityId].iconType = 0U;
-                        } else {
-                            __instance.productId = recipe.OutputMain.Count > 0
-                                ? recipe.OutputMain[0].OutputID
-                                : recipe.InputID;
-                            __instance.produceProb = 0.01f;
-                            signPool[entityId].iconId0 = (uint)__instance.fluidId;
-                            signPool[entityId].iconType = 1U;
-                            foreach (OutputInfo info in recipe.OutputMain) {
-                                products.Add(new(true, info.OutputID, 0));
-                            }
-                            foreach (OutputInfo info in recipe.OutputAppend) {
-                                products.Add(new(false, info.OutputID, 0));
-                            }
-                            extraState.InvalidateFullProductCache();
-                        }
-                        // 初始拾取一个后，尝试继续拾取同类物品以快速填满
-                        for (int i = 1;
-                             i < MaxOutputTimes && __instance.fluidInputCargoCount < fluidInputCargoMax;
-                             i++) {
-                            if (cargoTraffic.TryPickItemAtRear(__instance.belt2, needId, null, out stack, out inc)
-                                > 0) {
-                                __instance.fluidInputCount += stack;
-                                __instance.fluidInputInc += inc;
-                                __instance.fluidInputCargoCount++;
-                            } else {
-                                break;
-                            }
-                        }
-                    }
+            if (__instance.isOutput2) ProcessBeltOutputFluid(ref __instance, __instance.belt2, buildingID, enableFracForever, maxStack, cargoTraffic, fluidInputCountPerCargo);
+            else ProcessBeltInput(ref __instance, __instance.belt2, factory, cargoTraffic, fluidInputCountPerCargo, fluidInputCargoMax, MaxOutputTimes, ref fluidId, ref recipe, ref products, ref extraState, recipeType, entityId, signPool);
+        }
+        RecordFractionatorPerfStage(FractionatorPerfStageFluidBelts, GetFractionatorPerfElapsed(perfStageStart));
+        perfStageStart = GetFractionatorPerfTimestamp();
+        // 自动补料：输出堵了（BurstQueue有货）且输入不够 → 从数据中心拉
+        if (fluidId > 0 && __instance.isWorking && __instance.fluidInputCargoCount < fluidInputCargoMax
+                && FracAffixManager.GetBurstQueueCount(factory.planetId, __instance.id) > 0) {
+            int needSlots = fluidInputCargoMax - (int)__instance.fluidInputCargoCount;
+            int needTotal = needSlots * (int)fluidInputCountPerCargo;
+            if (needTotal > 0) {
+                int pulled = TakeItemFromModData(fluidId, needTotal, out int pulledInc);
+                if (pulled > 0) {
+                    __instance.fluidInputCount += pulled;
+                    __instance.fluidInputInc += pulledInc;
+                    __instance.fluidInputCargoCount += (float)pulled / fluidInputCountPerCargo;
+                    if (__instance.fluidInputCargoCount > fluidInputCargoMax) __instance.fluidInputCargoCount = fluidInputCargoMax;
                 }
             }
         }
@@ -742,380 +378,247 @@ public static partial class ProcessManager {
         if (__instance.belt0 > 0) {
             if (__instance.isOutput0) {
                 if (products.Count > 0) {
-                    //获取分馏塔产物输出堆叠
                     int productStack = maxStack;
-                    int lockedOutputId = isConversionTower && ConversionTower.EnableSingleLock
-                        ? __instance.GetNormalizedLockedOutput(factory)
-                        : 0;
-                    ProductOutputInfo product = SelectProductForBeltOutput(products, productStack, lockedOutputId,
-                        out bool flushNonLockedProduct);
-                    //输出产物
+                    int lockedOutputId = isConversionTower && ConversionTower.EnableSingleLock ? __instance.GetNormalizedLockedOutput(factory) : 0;
+                    var product = SelectProductForBeltOutput(products, productStack, lockedOutputId, out bool flushNonLockedProduct);
                     if (product != null && product.count > 0) {
-                        if (product.count >= productStack) {
-                            //产物达到最大堆叠数目，直接尝试输出
-                            if (cargoTraffic.TryInsertItemAtHead(__instance.belt0, product.itemId, (byte)productStack,
-                                    (byte)(productStack * (recipe?.GetOutputInc(product.itemId) ?? 0)))) {
-                                product.count -= productStack;
-                                extraState.InvalidateFullProductCache();
-                                needRecheckFullProduct = needRecheckFullProduct
-                                                         || hasFullProduct && product.count < productOutputMax;
-                                if (ReferenceEquals(product, product0)) {
-                                    __instance.productOutputCount = product.count;
-                                }
-                            }
-                        } else if (product.count > 0 && (flushNonLockedProduct || __instance.fluidInputCount == 0)) {
-                            // 单锁后非锁定产物要尽快清空；普通产物仍等输入停下后再吐出尾料。
-                            if (cargoTraffic.TryInsertItemAtHead(__instance.belt0, product.itemId, (byte)product.count,
-                                    (byte)(product.count * (recipe?.GetOutputInc(product.itemId) ?? 0)))) {
-                                product.count = 0;
-                                extraState.InvalidateFullProductCache();
-                                needRecheckFullProduct = needRecheckFullProduct || hasFullProduct;
-                                if (ReferenceEquals(product, product0)) {
-                                    __instance.productOutputCount = product.count;
-                                }
-                            }
+                        int toSend = product.count >= productStack ? productStack : product.count;
+                        if (cargoTraffic.TryInsertItemAtHead(__instance.belt0, product.itemId, (byte)toSend,
+                                (byte)(toSend * (recipe?.GetOutputInc(product.itemId) ?? 0)))) {
+                            product.count -= toSend; if (toSend < productStack) product.count = 0;
+                            extraState.InvalidateFullProductCache();
+                            needRecheckFullProduct = needRecheckFullProduct || hasFullProduct && product.count < productOutputMax;
+                            if (ReferenceEquals(product, product0)) __instance.productOutputCount = product.count;
+                            TryOutputBurstToBelt(factory.planetId, __instance.id, __instance.belt0, cargoTraffic, productStack, recipe);
+                        } else {
+                            // 传送带满了 → 直接扔进 BurstQueue
+                            product.count -= toSend; if (toSend < productStack) product.count = 0;
+                            FracAffixManager.EnqueueBurst(factory.planetId, __instance.id, toSend, product.itemId);
+                            extraState.InvalidateFullProductCache();
+                            if (ReferenceEquals(product, product0)) __instance.productOutputCount = product.count;
                         }
                     }
                 }
-            } else if (isInteractionTower
-                       && __instance.belt1 <= 0
-                       && __instance.belt2 <= 0
-                       && AreAllProductsEmpty(products)) {
-                //正面作为输入，数据传到数据中心。可接受未到最大价值，且GridIndex可见的物品。
+            } else if (isInteractionTower && __instance.belt1 <= 0 && __instance.belt2 <= 0 && AreAllProductsEmpty(products)) {
                 interactionMode = true;
-                int interactionItemId =
-                    cargoTraffic.TryPickItemAtRear(__instance.belt0, 0, ItemManager.needs, out stack, out inc);
+                int interactionItemId = cargoTraffic.TryPickItemAtRear(__instance.belt0, 0, ItemManager.needs, out byte stack, out byte inc);
                 if (interactionItemId > 0) {
                     AddItemToModData(interactionItemId, stack, inc);
-                    __instance.fluidId = interactionItemId;
-                    __instance.productId = interactionItemId;
-                    __instance.produceProb = 0.01f;
-                    signPool[entityId].iconId0 = (uint)__instance.fluidId;
-                    signPool[entityId].iconType = 1U;
+                    __instance.fluidId = interactionItemId; __instance.productId = interactionItemId;
+                    __instance.produceProb = 0.01f; signPool[entityId].iconId0 = (uint)__instance.fluidId; signPool[entityId].iconType = 1U;
                 }
             }
         }
-
         RecordFractionatorPerfStage(FractionatorPerfStageProductBelt, GetFractionatorPerfElapsed(perfStageStart));
         perfStageStart = GetFractionatorPerfTimestamp();
-        if (interactionMode) {
-            __instance.isWorking = true;
-        } else {
-            // 如果缓存区全部清空，重置全部
-            if (__instance.fluidInputCount == 0
-                && __instance.fluidOutputCount == 0
-                && AreAllProductsEmpty(products)) {
-                __instance.fluidId = 0;
-                __instance.productId = 0;
-                products.Clear();
-                hasFullProduct = false;
-                extraState.InvalidateFullProductCache();
-                signPool[entityId].iconId0 = 0;
-                signPool[entityId].iconType = 0U;
-                // C8: 单路锁定 - 缓存区清空后保留实体级锁定，允许空塔预设目标产物。
-                if (isConversionTower && !ConversionTower.EnableSingleLock) {
-                    __instance.SetLockedOutput(factory, 0);
-                }
+        if (interactionMode) __instance.isWorking = true;
+        else {
+            if (__instance.fluidInputCount == 0 && __instance.fluidOutputCount == 0 && AreAllProductsEmpty(products)) {
+                __instance.fluidId = 0; __instance.productId = 0; products.Clear(); hasFullProduct = false;
+                extraState.InvalidateFullProductCache(); signPool[entityId].iconId0 = 0; signPool[entityId].iconType = 0U;
+                if (isConversionTower && !ConversionTower.EnableSingleLock) __instance.SetLockedOutput(factory, 0);
             }
-            if (needRecheckFullProduct) {
-                hasFullProduct = extraState.HasFullProduct(productOutputMax, forceRefresh: true);
-            }
-            __instance.isWorking = __instance.fluidInputCount > 0
-                                   && !hasFullProduct
-                                   && __instance.fluidOutputCount < fluidOutputMax
-                                   && !moveDirectly;
+            if (needRecheckFullProduct) hasFullProduct = extraState.HasFullProduct(productOutputMax, true);
+            __instance.isWorking = __instance.fluidInputCount > 0 && !hasFullProduct && __instance.fluidOutputCount < fluidOutputMax && !moveDirectly;
         }
-
-        __result = !__instance.isWorking ? 0U : 1U;
+        __result = __instance.isWorking ? 1U : 0U;
         RecordFractionatorPerfStage(FractionatorPerfStageFinalize, GetFractionatorPerfElapsed(perfStageStart));
     }
 
     private static void AddProductRegisterDelta(ref List<ProductOutputInfo> deltas, int itemId, int count) {
-        if (count <= 0) {
-            return;
-        }
+        if (count <= 0) return;
         deltas ??= [];
-        ProductOutputInfo delta = FindProduct(deltas, itemId);
-        if (delta == null) {
-            deltas.Add(new ProductOutputInfo(false, itemId, count));
-            return;
-        }
-        delta.count += count;
+        var d = FindProduct(deltas, itemId);
+        if (d == null) deltas.Add(new ProductOutputInfo(false, itemId, count));
+        else d.count += count;
     }
 
     private static void FlushProcessingDeltas(BaseRecipe recipe, int buildingID, int fluidId, int consumedInputCount,
         int successCount, int fragmentRewardCount, List<ProductOutputInfo> productRegisterDeltas,
-        int[] productRegister, int[] consumeRegister, ref RecipeGrowthContext growthContext,
-        ref bool growthContextReady) {
-        if (consumedInputCount > 0) {
-            Interlocked.Add(ref consumeRegister[fluidId], consumedInputCount);
+        int[] productRegister, int[] consumeRegister, ref RecipeGrowthContext growthContext, ref bool growthContextReady) {
+        if (consumedInputCount > 0) Interlocked.Add(ref consumeRegister[fluidId], consumedInputCount);
+        if (productRegisterDeltas != null) foreach (var d in productRegisterDeltas) Interlocked.Add(ref productRegister[d.itemId], d.count);
+        if (successCount > 0) { RecordFractionSuccess(successCount); BuildingGrowthService.AddBuildingExp(buildingID, successCount); }
+        if (successCount > 0 && recipe != null && RecipeGrowthQueries.CanApplyProcessingProgress(recipe)) {
+            if (!growthContextReady) { growthContext = RecipeGrowthManager.BuildContext(); growthContextReady = true; }
+            RecipeGrowthExecutor.ApplyProcessingProgress(recipe, successCount, successCount, growthContext);
         }
-        if (productRegisterDeltas != null) {
-            foreach (ProductOutputInfo delta in productRegisterDeltas) {
-                Interlocked.Add(ref productRegister[delta.itemId], delta.count);
-            }
-        }
-        if (successCount > 0) {
-            RecordFractionSuccess(successCount);
-            BuildingGrowthService.AddBuildingExp(buildingID, successCount);
-        }
-        if (successCount > 0) {
-            if (recipe != null && RecipeGrowthQueries.CanApplyProcessingProgress(recipe)) {
-                if (!growthContextReady) {
-                    growthContext = RecipeGrowthManager.BuildContext();
-                    growthContextReady = true;
-                }
-                RecipeGrowthExecutor.ApplyProcessingProgress(recipe, successCount, successCount, growthContext);
-            }
-        }
-        if (fragmentRewardCount > 0) {
-            AddItemToModData(IFE残片, fragmentRewardCount, 0, false);
-        }
+        if (fragmentRewardCount > 0) AddItemToModData(IFE残片, fragmentRewardCount, 0, false);
     }
 
     private static void RecordFractionSuccess(int count) {
         totalFractionSuccesses += count;
         long second = GameMain.gameTick >= 0 ? GameMain.gameTick / 60L : 0L;
         AdvanceFractionRateWindow(second);
-
         int bucketIndex = (int)(second % FractionRateWindowSeconds);
         fractionSuccessBuckets[bucketIndex] += count;
         currentFractionSuccessesPerMinute += count;
-        if (currentFractionSuccessesPerMinute > peakFractionSuccessesPerMinute) {
-            peakFractionSuccessesPerMinute = currentFractionSuccessesPerMinute;
-        }
+        if (currentFractionSuccessesPerMinute > peakFractionSuccessesPerMinute) peakFractionSuccessesPerMinute = currentFractionSuccessesPerMinute;
     }
 
     private static void AdvanceFractionRateWindow(long second) {
-        if (currentFractionRateSecond < 0) {
-            currentFractionRateSecond = second;
-            return;
-        }
-
-        if (second <= currentFractionRateSecond) {
-            return;
-        }
-
+        if (currentFractionRateSecond < 0) { currentFractionRateSecond = second; return; }
+        if (second <= currentFractionRateSecond) return;
         long delta = second - currentFractionRateSecond;
         if (delta >= FractionRateWindowSeconds) {
             Array.Clear(fractionSuccessBuckets, 0, fractionSuccessBuckets.Length);
-            currentFractionSuccessesPerMinute = 0;
-            currentFractionRateSecond = second;
-            return;
+            currentFractionSuccessesPerMinute = 0; currentFractionRateSecond = second; return;
         }
-
-        for (long bucketSecond = currentFractionRateSecond + 1; bucketSecond <= second; bucketSecond++) {
-            int bucketIndex = (int)(bucketSecond % FractionRateWindowSeconds);
-            currentFractionSuccessesPerMinute -= fractionSuccessBuckets[bucketIndex];
-            if (currentFractionSuccessesPerMinute < 0) {
-                currentFractionSuccessesPerMinute = 0;
-            }
-            fractionSuccessBuckets[bucketIndex] = 0;
+        for (long bs = currentFractionRateSecond + 1; bs <= second; bs++) {
+            int bi = (int)(bs % FractionRateWindowSeconds);
+            long bv = fractionSuccessBuckets[bi];
+            if (bv > 0) { currentFractionSuccessesPerMinute -= bv; if (currentFractionSuccessesPerMinute < 0) currentFractionSuccessesPerMinute = 0; fractionSuccessBuckets[bi] = 0; }
         }
         currentFractionRateSecond = second;
     }
 
     private static void ResetFractionRateWindow() {
         Array.Clear(fractionSuccessBuckets, 0, fractionSuccessBuckets.Length);
-        currentFractionRateSecond = -1;
-        currentFractionSuccessesPerMinute = 0;
+        currentFractionRateSecond = -1; currentFractionSuccessesPerMinute = 0;
     }
 
     private static ProductOutputInfo FindProduct(List<ProductOutputInfo> products, int itemId, bool mainOnly = false) {
-        foreach (ProductOutputInfo product in products) {
-            if (product.itemId != itemId) {
-                continue;
-            }
-            if (mainOnly && !product.isMainOutput) {
-                continue;
-            }
-            return product;
-        }
+        foreach (var p in products) { if (p.itemId != itemId) continue; if (mainOnly && !p.isMainOutput) continue; return p; }
         return null;
     }
 
-    private static ProductOutputInfo SelectByNormalOutputPriority(ProductOutputInfo bestSideProduct,
-        ProductOutputInfo bestMainProduct, int productStack) {
-        ProductOutputInfo product = bestSideProduct;
-        if (product == null || product.count < productStack) {
-            if (bestMainProduct != null && (product == null || bestMainProduct.count > product.count)) {
-                product = bestMainProduct;
-            }
-        }
-        return product;
+    private static ProductOutputInfo SelectByNormalOutputPriority(ProductOutputInfo bestSide, ProductOutputInfo bestMain, int stack) {
+        var p = bestSide;
+        if (p == null || p.count < stack) { if (bestMain != null && (p == null || bestMain.count > p.count)) p = bestMain; }
+        return p;
     }
 
-    private static ProductOutputInfo SelectProductForBeltOutput(List<ProductOutputInfo> products, int productStack,
-        int lockedOutputId, out bool flushNonLockedProduct) {
-        ProductOutputInfo bestSideProduct = null;
-        ProductOutputInfo bestMainProduct = null;
-        ProductOutputInfo bestNonLockedSideProduct = null;
-        ProductOutputInfo bestNonLockedMainProduct = null;
-        foreach (ProductOutputInfo p in products) {
-            if (p.count <= 0) {
-                continue;
-            }
+    private static ProductOutputInfo SelectProductForBeltOutput(List<ProductOutputInfo> products, int productStack, int lockedOutputId, out bool flushNonLocked) {
+        ProductOutputInfo bestSide = null, bestMain = null, bestNonSide = null, bestNonMain = null;
+        foreach (var p in products) {
+            if (p.count <= 0) continue;
             if (p.isMainOutput) {
-                if (bestMainProduct == null || p.count > bestMainProduct.count) {
-                    bestMainProduct = p;
-                }
-                if (lockedOutputId != 0
-                    && p.itemId != lockedOutputId
-                    && (bestNonLockedMainProduct == null || p.count > bestNonLockedMainProduct.count)) {
-                    bestNonLockedMainProduct = p;
-                }
+                if (bestMain == null || p.count > bestMain.count) bestMain = p;
+                if (lockedOutputId != 0 && p.itemId != lockedOutputId && (bestNonMain == null || p.count > bestNonMain.count)) bestNonMain = p;
             } else {
-                if (bestSideProduct == null || p.count > bestSideProduct.count) {
-                    bestSideProduct = p;
-                }
-                if (lockedOutputId != 0
-                    && p.itemId != lockedOutputId
-                    && (bestNonLockedSideProduct == null || p.count > bestNonLockedSideProduct.count)) {
-                    bestNonLockedSideProduct = p;
-                }
+                if (bestSide == null || p.count > bestSide.count) bestSide = p;
+                if (lockedOutputId != 0 && p.itemId != lockedOutputId && (bestNonSide == null || p.count > bestNonSide.count)) bestNonSide = p;
             }
         }
-
-        ProductOutputInfo nonLockedProduct = SelectByNormalOutputPriority(bestNonLockedSideProduct,
-            bestNonLockedMainProduct, productStack);
-        if (nonLockedProduct != null) {
-            flushNonLockedProduct = true;
-            return nonLockedProduct;
-        }
-
-        flushNonLockedProduct = false;
-        return SelectByNormalOutputPriority(bestSideProduct, bestMainProduct, productStack);
+        var nonLocked = SelectByNormalOutputPriority(bestNonSide, bestNonMain, productStack);
+        if (nonLocked != null) { flushNonLocked = true; return nonLocked; }
+        flushNonLocked = false;
+        return SelectByNormalOutputPriority(bestSide, bestMain, productStack);
     }
 
     private static bool MatchesRecipeOutputs(List<ProductOutputInfo> products, BaseRecipe recipe) {
-        int expectedCount = recipe.OutputMain.Count + recipe.OutputAppend.Count;
-        if (products.Count != expectedCount) {
-            return false;
-        }
-
-        int productIndex = 0;
-        for (int i = 0; i < recipe.OutputMain.Count; i++, productIndex++) {
-            ProductOutputInfo product = products[productIndex];
-            if (!product.isMainOutput || product.itemId != recipe.OutputMain[i].OutputID) {
-                return false;
-            }
-        }
-
-        for (int i = 0; i < recipe.OutputAppend.Count; i++, productIndex++) {
-            ProductOutputInfo product = products[productIndex];
-            if (product.isMainOutput || product.itemId != recipe.OutputAppend[i].OutputID) {
-                return false;
-            }
-        }
-
+        int expected = recipe.OutputMain.Count + recipe.OutputAppend.Count;
+        if (products.Count != expected) return false;
+        int idx = 0;
+        for (int i = 0; i < recipe.OutputMain.Count; i++, idx++) { var p = products[idx]; if (!p.isMainOutput || p.itemId != recipe.OutputMain[i].OutputID) return false; }
+        for (int i = 0; i < recipe.OutputAppend.Count; i++, idx++) { var p = products[idx]; if (p.isMainOutput || p.itemId != recipe.OutputAppend[i].OutputID) return false; }
         return true;
     }
 
-    private static void NotifyProductCountIncreased(FractionatorOutputState.FractionatorExtraState extraState,
-        int productCount, int productOutputMax, ref bool hasFullProduct) {
-
-        extraState.InvalidateFullProductCache();
-        if (productCount >= productOutputMax) {
-            hasFullProduct = true;
-            extraState.MarkFullProductCache(productOutputMax);
-        }
+    private static void NotifyProductCountIncreased(FractionatorOutputState.FractionatorExtraState es, int count, int max, ref bool full) {
+        es.InvalidateFullProductCache();
+        if (count >= max) { full = true; es.MarkFullProductCache(max); }
     }
 
     private static bool AreAllProductsEmpty(List<ProductOutputInfo> products) {
-        foreach (ProductOutputInfo product in products) {
-            if (product.count > 0) {
-                return false;
-            }
-        }
+        foreach (var p in products) if (p.count > 0) return false;
         return true;
     }
 
-    private static int GetFluidOutputStackToMove(FractionatorComponent fractionator, int preferredStack) {
-        if (fractionator.fluidOutputCount >= preferredStack) {
-            return preferredStack;
-        }
-        // 输入已空时释放不足一组的尾料，避免旧 fluidId 被残留流动输出卡住。
-        return fractionator.fluidInputCount == 0 ? fractionator.fluidOutputCount : 0;
+    private static int GetFluidOutputStackToMove(FractionatorComponent f, int preferred) {
+        if (f.fluidOutputCount >= preferred) return preferred;
+        return f.fluidInputCount == 0 ? f.fluidOutputCount : 0;
     }
 
-    private static int GetFluidOutputIncAvg(FractionatorComponent fractionator, int buildingID, int outputStack) {
-        if (outputStack <= 0 || fractionator.fluidOutputCount <= 0) {
-            return 0;
-        }
-        return fractionator.fluidOutputInc / fractionator.fluidOutputCount;
+    private static int GetFluidOutputIncAvg(FractionatorComponent f, int bid, int stack) {
+        if (stack <= 0 || f.fluidOutputCount <= 0) return 0;
+        if (bid == IFE点数聚集塔) return f.fluidOutputInc >= 4 * stack ? 4 : 0;
+        return f.fluidOutputInc / f.fluidOutputCount;
     }
 
-    private static void RemoveFluidOutput(ref FractionatorComponent fractionator, int outputStack, int incAvg) {
-        fractionator.fluidOutputCount -= outputStack;
-        fractionator.fluidOutputInc -= incAvg * outputStack;
-        if (fractionator.fluidOutputCount <= 0) {
-            fractionator.fluidOutputCount = 0;
-            fractionator.fluidOutputInc = 0;
-        } else if (fractionator.fluidOutputInc < 0) {
-            fractionator.fluidOutputInc = 0;
+    private static void RemoveFluidOutput(ref FractionatorComponent f, int stack, int incAvg) {
+        f.fluidOutputCount -= stack; f.fluidOutputInc -= incAvg * stack;
+        if (f.fluidOutputCount <= 0) { f.fluidOutputCount = 0; f.fluidOutputInc = 0; }
+        else if (f.fluidOutputInc < 0) f.fluidOutputInc = 0;
+    }
+
+    /// <summary>统一的传送带输入处理</summary>
+    private static void ProcessBeltInput(ref FractionatorComponent __instance, int beltId,
+        PlanetFactory factory, CargoTraffic cargoTraffic, float fluidInputCountPerCargo,
+        int fluidInputCargoMax, int maxOutputTimes, ref int fluidId, ref BaseRecipe recipe,
+        ref List<ProductOutputInfo> products, ref FractionatorOutputState.FractionatorExtraState extraState,
+        ERecipe recipeType, int entityId, SignData[] signPool) {
+        if (beltId <= 0 || __instance.fluidInputCargoCount >= fluidInputCargoMax) return;
+        if (fluidId > 0) {
+            for (int i = 0; i < maxOutputTimes && __instance.fluidInputCargoCount < fluidInputCargoMax; i++) {
+                if (cargoTraffic.TryPickItemAtRear(beltId, fluidId, null, out byte stack, out byte inc) > 0) {
+                    __instance.fluidInputCount += stack; __instance.fluidInputInc += inc; __instance.fluidInputCargoCount++;
+                } else break;
+            }
+        } else {
+            int needId = cargoTraffic.TryPickItemAtRear(beltId, 0, null, out byte stack2, out byte inc2);
+            if (needId <= 0) return;
+            __instance.fluidInputCount += stack2; __instance.fluidInputInc += inc2; __instance.fluidInputCargoCount++;
+            __instance.fluidId = needId; fluidId = needId;
+            recipe = extraState.GetRecipe(recipeType, needId);
+            if (recipe == null) { __instance.productId = needId; __instance.produceProb = 0.01f; signPool[entityId].iconId0 = 0; signPool[entityId].iconType = 0U; }
+            else {
+                __instance.productId = recipe.OutputMain.Count > 0 ? recipe.OutputMain[0].OutputID : recipe.InputID;
+                __instance.produceProb = 0.01f; signPool[entityId].iconId0 = (uint)__instance.fluidId; signPool[entityId].iconType = 1U;
+                foreach (var info in recipe.OutputMain) products.Add(new(true, info.OutputID, 0));
+                foreach (var info in recipe.OutputAppend) products.Add(new(false, info.OutputID, 0));
+                extraState.InvalidateFullProductCache();
+            }
+            for (int i = 1; i < maxOutputTimes && __instance.fluidInputCargoCount < fluidInputCargoMax; i++) {
+                if (cargoTraffic.TryPickItemAtRear(beltId, needId, null, out byte stack3, out byte inc3) > 0) {
+                    __instance.fluidInputCount += stack3; __instance.fluidInputInc += inc3; __instance.fluidInputCargoCount++;
+                } else break;
+            }
         }
     }
 
-    private static int GetPreferredFluidOutputStack(bool enableFluidEnhancement, int fluidStack,
-        float fluidInputCountPerCargo, bool forceSingleStack) {
-        if (forceSingleStack) {
-            return 1;
-        }
-        int inputStack = Mathf.Max(1, Mathf.RoundToInt(fluidInputCountPerCargo));
-        return enableFluidEnhancement ? Math.Max(fluidStack, inputStack) : inputStack;
+    /// <summary>统一的传送带输出处理(flow)</summary>
+    private static void ProcessBeltOutputFluid(ref FractionatorComponent __instance, int beltId,
+        int buildingID, bool enableFluidEnhancement, int maxStack, CargoTraffic cargoTraffic, float fluidInputCountPerCargo) {
+        if (beltId <= 0 || __instance.fluidOutputCount <= 0) return;
+        TryOutputFluidToBelt(ref __instance, buildingID, enableFluidEnhancement, maxStack, cargoTraffic, beltId, fluidInputCountPerCargo);
     }
 
-    private static bool TryInsertFluidOutputAtHead(CargoPath cargoPath, int itemId, int maxStack,
-        int outputStack, int incAvg, out int insertedStack) {
-
-        insertedStack = outputStack;
-        if (cargoPath.TryUpdateItemAtHeadAndFillBlank(itemId, maxStack, (byte)outputStack,
-                (byte)Math.Min(255, incAvg * outputStack))) {
-            return true;
-        }
-
-        if (outputStack <= 1) {
-            insertedStack = 0;
-            return false;
-        }
-
-        // 循环带头部可能已有同类半堆；整组写入失败时，退回单个填充以打破无空位卡死。
-        insertedStack = 1;
-        if (cargoPath.TryUpdateItemAtHeadAndFillBlank(itemId, maxStack, 1,
-                (byte)Math.Min(255, incAvg))) {
-            return true;
-        }
-
-        insertedStack = 0;
-        return false;
+    /// <summary>BurstQueue 优先供传送带</summary>
+    private static void TryOutputBurstToBelt(int planetId, int fractionatorId, int beltId,
+        CargoTraffic cargoTraffic, int productStack, BaseRecipe recipe) {
+        long available = FracAffixManager.GetBurstQueueCount(planetId, fractionatorId);
+        if (available <= 0) return;
+        int itemId = CurrentRecipeProductId;
+        if (itemId <= 0) return;
+        long toMove = available < productStack ? available : productStack;
+        if (cargoTraffic.TryInsertItemAtHead(beltId, itemId, (byte)toMove,
+                (byte)(toMove * (recipe?.GetOutputInc(itemId) ?? 0))))
+            FracAffixManager.DequeueBurst(planetId, fractionatorId, toMove);
     }
 
     private static void TryOutputFluidToBelt(ref FractionatorComponent fractionator, int buildingID,
-        bool enableFluidEnhancement, int fluidStack, CargoTraffic cargoTraffic, int beltId,
-        float fluidInputCountPerCargo, bool forceSingleStack = false) {
-        if (beltId <= 0 || fractionator.fluidOutputCount <= 0) {
+        bool enableFluidEnhancement, int fluidStack, CargoTraffic cargoTraffic, int beltId, float fluidInputCountPerCargo) {
+        if (beltId <= 0 || fractionator.fluidOutputCount <= 0) return;
+        if (enableFluidEnhancement) {
+            for (int i = 0; i < MaxOutputTimes && fractionator.fluidOutputCount > 0; i++) {
+                int stack = GetFluidOutputStackToMove(fractionator, fluidStack);
+                if (stack <= 0) break;
+                int avgInc = GetFluidOutputIncAvg(fractionator, buildingID, stack);
+                if (!cargoTraffic.TryInsertItemAtHead(beltId, fractionator.fluidId, (byte)stack, (byte)Math.Min(255, avgInc * stack))) break;
+                RemoveFluidOutput(ref fractionator, stack, avgInc);
+            }
             return;
         }
-
-        // 流动强化不能把高堆叠输入拆回塔等级上限，否则循环带会被侧边输出口反向限速卡住。
-        // 无配方/配方未解锁的直通物不应用塔等级集装输出，保持原版单件流动输出语义。
-        int preferredStack = GetPreferredFluidOutputStack(enableFluidEnhancement, fluidStack, fluidInputCountPerCargo,
-            forceSingleStack);
-        CargoPath cargoPath = cargoTraffic.GetCargoPath(cargoTraffic.beltPool[beltId].segPathId);
-        if (cargoPath == null) {
-            return;
-        }
+        var cargoPath = cargoTraffic.GetCargoPath(cargoTraffic.beltPool[beltId].segPathId);
+        if (cargoPath == null) return;
+        int preferredStack = Mathf.Max(1, Mathf.RoundToInt(fluidInputCountPerCargo));
         for (int i = 0; i < MaxOutputTimes && fractionator.fluidOutputCount > 0; i++) {
-            int outputStack = GetFluidOutputStackToMove(fractionator, preferredStack);
-            if (outputStack <= 0) {
-                break;
-            }
-            int fluidOutputIncAvg = GetFluidOutputIncAvg(fractionator, buildingID, outputStack);
-            if (!TryInsertFluidOutputAtHead(cargoPath, fractionator.fluidId, preferredStack, outputStack,
-                    fluidOutputIncAvg, out int insertedStack)) {
-                break;
-            }
-            RemoveFluidOutput(ref fractionator, insertedStack, fluidOutputIncAvg);
+            int stack = GetFluidOutputStackToMove(fractionator, preferredStack);
+            if (stack <= 0) break;
+            int avgInc = GetFluidOutputIncAvg(fractionator, buildingID, stack);
+            if (!cargoPath.TryUpdateItemAtHeadAndFillBlank(fractionator.fluidId, Mathf.CeilToInt((float)(fluidInputCountPerCargo / stack - 0.1)), (byte)stack, (byte)Math.Min(255, avgInc * stack))) break;
+            RemoveFluidOutput(ref fractionator, stack, avgInc);
         }
     }
 
@@ -1123,37 +626,18 @@ public static partial class ProcessManager {
 
     #region IModCanSave
 
-    /// <summary>
-    /// 将该分馏域状态写入存档。
-    /// </summary>
     public static void Export(BinaryWriter w) {
-        w.WriteBlocks(
-            ("TotalFractionSuccesses", bw => bw.Write(totalFractionSuccesses)),
-            ("PeakFractionSuccessesPerMinute", bw => bw.Write(peakFractionSuccessesPerMinute)),
-            ("Sacrifice", SacrificeExport)
-        );
+        w.WriteBlocks(("TotalFractionSuccesses", bw => bw.Write(totalFractionSuccesses)), ("PeakFractionSuccessesPerMinute", bw => bw.Write(peakFractionSuccessesPerMinute)));
     }
 
-    /// <summary>
-    /// 从存档读取该分馏域状态。
-    /// </summary>
     public static void Import(BinaryReader r) {
         ResetFractionRateWindow();
-        r.ReadBlocks(
-            ("TotalFractionSuccesses", br => totalFractionSuccesses = Math.Max(0, br.ReadInt64())),
-            ("PeakFractionSuccessesPerMinute", br => peakFractionSuccessesPerMinute = Math.Max(0, br.ReadInt64())),
-            ("Sacrifice", SacrificeImport)
-        );
+        r.ReadBlocks(("TotalFractionSuccesses", br => totalFractionSuccesses = Math.Max(0, br.ReadInt64())), ("PeakFractionSuccessesPerMinute", br => peakFractionSuccessesPerMinute = Math.Max(0, br.ReadInt64())));
     }
 
-    /// <summary>
-    /// 切换或进入其他存档时重置该分馏域状态。
-    /// </summary>
     public static void IntoOtherSave() {
-        totalFractionSuccesses = 0;
-        peakFractionSuccessesPerMinute = 0;
-        ResetFractionRateWindow();
-        ResetSacrificeBoostState();
+        totalFractionSuccesses = 0; peakFractionSuccessesPerMinute = 0;
+        ResetFractionRateWindow(); ResetSacrificeBoostState();
     }
 
     #endregion

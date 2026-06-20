@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using BepInEx.Configuration;
 using FE.Logic.Fractionation.Fractionators;
@@ -49,24 +50,22 @@ public static class MainTask {
         Register("节点状态-已完成", "Completed", "已完成");
         Register("节点详情-条件", "Condition:", "条件：");
         Register("节点详情-奖励", "Reward:", "奖励：");
-        Register("节点详情-阶段奖励", "Stage reward:", "阶段奖励：");
         Register("节点详情-状态", "State:", "状态：");
         Register("节点详情-推荐阶段", "Recommended stage:", "推荐阶段：");
         Register("节点详情-推荐说明", "Recommendation only. It does not block other milestones.",
             "这只是推荐阶段，不限制实际完成顺序。");
         Register("主线里程碑达成提示", "Main milestone unlocked: {0}", "主线里程碑达成：{0}");
-        Register("主线阶段完成提示", "Main stage completed: {0}", "主线阶段完成：{0}");
         Register("是", "Yes");
         Register("否", "No");
         Register("无", "None", "无");
         Register("数量", "Count", "数量");
         Register("分馏次数", "Fractionations", "分馏次数");
-        Register("主线统计-路线偏好抽取", "Route-preference draws", "路线偏好抽取");
-        Register("主线统计-原胚偏好抽取", "Proto-preference draws", "原胚偏好抽取");
+        Register("主线统计-开线抽取", "Opening draws", "开线抽取");
+        Register("主线统计-原胚抽取", "Proto draws", "原胚抽取");
         Register("科技解锁", "Tech unlocked", "科技解锁");
         Register("物品解锁", "Item unlocked", "物品解锁");
         Register("建筑等级", "Building level", "建筑等级");
-        Register("四塔最低等级", "Min tower level", "四塔最低等级");
+        Register("五塔最低等级", "Min tower level", "五塔最低等级");
         Register("解锁配方", "Unlocked recipes", "解锁配方");
         Register("配方等级", "Recipe level", "配方等级");
         Register("聚焦流派", "Focus style", "聚焦流派");
@@ -74,13 +73,16 @@ public static class MainTask {
         Register("上传建筑", "Uploaded buildings", "上传建筑");
         Register("提取次数", "Extracts", "提取次数");
         Register("上传次数", "Uploads", "上传次数");
+        Register("交易次数", "Trades", "交易次数");
         Register("主线统计-市场订单", "Market orders", "市场订单");
         Register("主线统计-残片兑换", "Fragment exchanges", "残片兑换");
         Register("主线统计-成长报价", "Growth offers", "成长报价");
+        Register("主线统计-循环任务", "Recurring tasks", "循环任务");
         Register("主线节点-流派聚焦", "Focus Style", "流派聚焦");
         Register("主线节点-成长报价", "Growth Offer", "成长报价");
         Register("主线节点-市场订单", "Market Order", "市场订单");
         Register("主线节点-残片兑换", "Fragment Exchange", "残片兑换");
+        Register("循环类型", "Recurring types", "循环类型");
         Register("资源层级", "Resource tier", "资源层级");
         Register("黑雾阶段", "Dark Fog stage", "黑雾阶段");
         Register("休眠观察", "Dormant", "休眠观察");
@@ -110,6 +112,7 @@ public static class MainTask {
             ("低档建筑等级", "Early Building Levels"),
             ("低档配方", "Early Recipes"),
             ("资源交互", "Resource Interaction"),
+            ("循环任务入门", "Recurring Intro"),
             ("黑雾早期", "Early Dark Fog"),
             ("分馏启示", "Fractionation Insight"),
             ("电磁入门", "Electromagnetic Start"),
@@ -131,24 +134,24 @@ public static class MainTask {
             ("分馏两百次", "Two Hundred Fractionations"),
             ("分馏三百次", "Three Hundred Fractionations"),
             ("主线闭环", "Main Closure"),
-            ("首次路线偏好", "First Route Preference"),
-            ("路线偏好五次", "Five Route Preferences"),
-            ("路线偏好十次", "Ten Route Preferences"),
-            ("路线偏好二十次", "Twenty Route Preferences"),
-            ("路线偏好五十次", "Fifty Route Preferences"),
-            ("首次原胚偏好", "First Proto Preference"),
-            ("原胚偏好五次", "Five Proto Preferences"),
-            ("原胚偏好十次", "Ten Proto Preferences"),
+            ("首次开线", "First Opening"),
+            ("开线五次", "Five Openings"),
+            ("开线十次", "Ten Openings"),
+            ("开线二十次", "Twenty Openings"),
+            ("开线五十次", "Fifty Openings"),
+            ("首次原胚", "First Proto Draw"),
+            ("原胚五次", "Five Proto Draws"),
+            ("原胚十次", "Ten Proto Draws"),
             ("首次配方", "First Recipe"),
             ("首次升级", "First Upgrade"),
             ("首次补差", "First Catch-up"),
             ("首获原胚", "First Proto"),
             ("原胚整备", "Proto Setup"),
-            ("四类原胚", "Four Proto Types"),
+            ("五类原胚", "Five Proto Types"),
             ("首次培养", "First Cultivation"),
-            ("四塔培养", "Four Tower Cultivation"),
+            ("五塔培养", "Five Tower Cultivation"),
             ("首次上传", "First Upload"),
-            ("四塔上传", "Four Tower Upload"),
+            ("五塔上传", "Five Tower Upload"),
             ("建筑 1 级", "Building Level 1"),
             ("建筑 2 级", "Building Level 2"),
             ("建筑 3 级", "Building Level 3"),
@@ -163,6 +166,10 @@ public static class MainTask {
             ("配方 40 个", "40 Recipes"),
             ("物品交互", "Item Interaction"),
             ("首次提取", "First Extract"),
+            ("首次交易", "First Trade"),
+            ("首次循环", "First Recurring"),
+            ("循环五次", "Five Recurring"),
+            ("六类循环", "Six Recurring Types"),
             ("黑雾矩阵", "Dark Fog Matrix"),
             ("资源层 1", "Resource Tier 1"),
             ("资源层 2", "Resource Tier 2"),
@@ -178,15 +185,11 @@ public static class MainTask {
             ("累计完成 10 次分馏成功", "Reach 10 successful fractionations"),
             ("累计完成 50 次分馏成功", "Reach 50 successful fractionations"),
             ("累计完成 200 次分馏成功", "Reach 200 successful fractionations"),
-            ("累计完成 1 次主抽取路线偏好", "Perform 1 Main Draw route-preference draw"),
-            ("累计完成 5 次主抽取路线偏好", "Perform 5 Main Draw route-preference draws"),
-            ("累计完成 20 次主抽取路线偏好", "Perform 20 Main Draw route-preference draws"),
-            ("累计完成 50 次主抽取路线偏好", "Perform 50 Main Draw route-preference draws"),
-            ("累计完成 100 次主抽取路线偏好", "Perform 100 Main Draw route-preference draws"),
-            ("累计完成 200 次主抽取路线偏好", "Perform 200 Main Draw route-preference draws"),
-            ("累计完成 1 次主抽取原胚偏好", "Perform 1 Main Draw proto-preference draw"),
-            ("累计完成 5 次主抽取原胚偏好", "Perform 5 Main Draw proto-preference draws"),
-            ("累计完成 10 次主抽取原胚偏好", "Perform 10 Main Draw proto-preference draws"),
+            ("累计完成 5 次开线抽取", "Perform 5 opening draws"),
+            ("累计完成 20 次开线抽取", "Perform 20 opening draws"),
+            ("累计完成 50 次开线抽取", "Perform 50 opening draws"),
+            ("累计完成 100 次开线抽取", "Perform 100 opening draws"),
+            ("累计完成 200 次开线抽取", "Perform 200 opening draws"),
             ("解锁矿物复制科技", "Unlock Mineral Replication technology"),
             ("解锁分馏塔原胚科技", "Unlock Fractionator Proto technology"),
             ("解锁物品转化科技", "Unlock Item Conversion technology"),
@@ -200,7 +203,7 @@ public static class MainTask {
             ("累计解锁 80 个分馏配方", "Unlock 80 fractionation recipes"),
             ("累计解锁 100 个分馏配方并完成 5000 次分馏成功", "Unlock 100 recipes and reach 5000 successful fractionations"),
             ("累计完成 800 次分馏成功", "Reach 800 successful fractionations"),
-            ("累计完成 10 次主抽取路线偏好", "Perform 10 Main Draw route-preference draws"),
+            ("累计完成 10 次开线抽取", "Perform 10 opening draws"),
             ("解锁 30 个分馏配方", "Unlock 30 fractionation recipes"),
             ("累计解锁 30 个分馏配方", "Unlock 30 fractionation recipes"),
             ("累计解锁 60 个分馏配方并完成 3000 次分馏成功", "Unlock 60 recipes and reach 3000 successful fractionations"),
@@ -372,14 +375,14 @@ public static class MainTask {
                     () =>
                         $"{GetRecipeProgressText(finalRecipeTarget)} / {GetCountProgressText("分馏次数", totalFractionSuccesses, finalFractionTarget)}")),
             Branch("draw-low", "低档抽取",
-                DrawNode("draw-opening-1", "首次路线偏好", "累计完成 1 次主抽取路线偏好", 1, IFE残片, 1, true, 100),
-                DrawNode("draw-opening-5", "路线偏好五次", "累计完成 5 次主抽取路线偏好", 1, IFE残片, 5, true, 150),
-                DrawNode("draw-opening-10", "路线偏好十次", "累计完成 10 次主抽取路线偏好", 2, IFE残片, 10, true, 200),
-                DrawNode("draw-opening-20", "路线偏好二十次", "累计完成 20 次主抽取路线偏好", 2, IFE残片, 20, true, 300),
-                DrawNode("draw-opening-50", "路线偏好五十次", "累计完成 50 次主抽取路线偏好", 3, IFE残片, 50, true, 500),
-                DrawNode("draw-proto-1", "首次原胚偏好", "累计完成 1 次主抽取原胚偏好", 2, IFE交互塔原胚, 1, false, 1),
-                DrawNode("draw-proto-5", "原胚偏好五次", "累计完成 5 次主抽取原胚偏好", 3, IFE矿物复制塔原胚, 5, false, 1),
-                DrawNode("draw-proto-10", "原胚偏好十次", "累计完成 10 次主抽取原胚偏好", 4, IFE转化塔原胚, 10, false, 1)),
+                DrawNode("draw-opening-1", "首次开线", "累计完成 1 次开线抽取", 1, IFE残片, 1, true, 100),
+                DrawNode("draw-opening-5", "开线五次", "累计完成 5 次开线抽取", 1, IFE残片, 5, true, 150),
+                DrawNode("draw-opening-10", "开线十次", "累计完成 10 次开线抽取", 2, IFE残片, 10, true, 200),
+                DrawNode("draw-opening-20", "开线二十次", "累计完成 20 次开线抽取", 2, IFE残片, 20, true, 300),
+                DrawNode("draw-opening-50", "开线五十次", "累计完成 50 次开线抽取", 3, IFE残片, 50, true, 500),
+                DrawNode("draw-proto-1", "首次原胚", "累计完成 1 次原胚抽取", 2, IFE交互塔原胚, 1, false, 1),
+                DrawNode("draw-proto-5", "原胚五次", "累计完成 5 次原胚抽取", 3, IFE矿物复制塔原胚, 5, false, 1),
+                DrawNode("draw-proto-10", "原胚十次", "累计完成 10 次原胚抽取", 4, IFE转化塔原胚, 10, false, 1)),
             Branch("growth-plan", "成长规划",
                 Node("growth-recipe-1", "首次配方", "解锁第 1 个分馏配方", 1, IFE残片, IFE残片, 150,
                     () => GetUnlockedRecipeCount() >= 1, () => GetRecipeProgressText(1)),
@@ -388,25 +391,25 @@ public static class MainTask {
                 Node("growth-focus", "主线节点-流派聚焦", "切换到任意非均衡聚焦流派", 2, IFE残片, IFE残片, 250,
                     () => CurrentFocus != GachaFocusType.Balanced, () => GetFocusProgressText()),
                 Node("growth-offer", "主线节点-成长报价", "解锁至少 1 项黑雾成长报价", 7, I黑雾矩阵, IFE残片, 400,
-                    () => GachaService.GetDarkFogGrowthOfferCount() >= 1,
-                    () => GetCountProgressText("主线统计-成长报价", GachaService.GetDarkFogGrowthOfferCount(), 1)),
+                    () => DarkFogCombatManager.GetUnlockedGrowthOfferCount() >= 1,
+                    () => GetCountProgressText("主线统计-成长报价", DarkFogCombatManager.GetUnlockedGrowthOfferCount(), 1)),
                 Node("growth-catchup", "首次补差", "完成至少 1 次市场板订单", 7, I黑雾矩阵, IFE残片, 500,
                     () => MarketBoardManager.TotalCompletedOfferCount >= 1,
                     () => GetCountProgressText("主线统计-市场订单", MarketBoardManager.TotalCompletedOfferCount, 1))),
             Branch("proto-building", "原胚建筑",
                 ProtoNode("proto-first", "首获原胚", "持有任意 1 个分馏塔原胚", 1, IFE交互塔原胚, 1),
                 ProtoNode("proto-three", "原胚整备", "累计持有 3 类分馏塔原胚", 2, IFE矿物复制塔原胚, 3),
-                ProtoNode("proto-four", "四类原胚", "累计持有 4 类分馏塔原胚", 4, IFE分馏塔定向原胚, 4),
+                ProtoNode("proto-five", "五类原胚", "累计持有 5 类分馏塔原胚", 4, IFE分馏塔定向原胚, 5),
                 Node("building-train-one", "首次培养", "任意万物分馏建筑等级达到 1", 1, IFE交互塔, IFE残片, 200,
                     () => GetMaxBuildingLevel() >= 1, () => GetBuildingLevelProgressText(1)),
-                Node("building-train-four", "四塔培养", "四类万物分馏建筑均达到 1 级", 4, IFE转化塔, IFE残片, 600,
+                Node("building-train-five", "五塔培养", "五类万物分馏建筑均达到 1 级", 4, IFE点数聚集塔, IFE残片, 600,
                     () => GetMinBuildingLevel() >= 1, () => GetMinBuildingLevelProgressText(1)),
-                Node("building-upload-one", "首次上传", "累计向分馏数据中心上传任意万物分馏建筑", 2, IFE交互塔, IFE残片, 200,
+                Node("building-upload-one", "首次上传", "分馏数据中心内持有任意万物分馏建筑", 2, IFE交互塔, IFE残片, 200,
                     () => GetUploadedBuildingTypeCount() >= 1,
                     () => GetCountProgressText("上传建筑", GetUploadedBuildingTypeCount(), 1)),
-                Node("building-upload-four", "四塔上传", "累计向分馏数据中心上传四类万物分馏建筑", 5, IFE精馏塔, IFE残片, 800,
-                    () => GetUploadedBuildingTypeCount() >= 4,
-                    () => GetCountProgressText("上传建筑", GetUploadedBuildingTypeCount(), 4))),
+                Node("building-upload-five", "五塔上传", "分馏数据中心内持有五类万物分馏建筑", 5, IFE精馏塔, IFE残片, 800,
+                    () => GetUploadedBuildingTypeCount() >= 5,
+                    () => GetCountProgressText("上传建筑", GetUploadedBuildingTypeCount(), 5))),
             Branch("building-level-low", "低档建筑等级",
                 BuildingLevelNode("building-level-1", "建筑 1 级", 1, 1, 200),
                 BuildingLevelNode("building-level-2", "建筑 2 级", 2, 2, 300),
@@ -430,12 +433,24 @@ public static class MainTask {
                 Node("resource-upload", "首次上传", "向分馏数据中心手动上传至少 1 次物品", 2, IFE残片, IFE残片, 200,
                     () => DataCenterInventory.ManualUploadCount >= 1,
                     () => GetCountProgressText("上传次数", DataCenterInventory.ManualUploadCount, 1)),
+                Node("resource-trade", "首次交易", "在交易所完成至少 1 次买入或卖出", 3, IFE残片, IFE残片, 300,
+                    () => ExchangeManager.TotalTradeCount >= 1,
+                    () => GetCountProgressText("交易次数", ExchangeManager.TotalTradeCount, 1)),
                 Node("resource-board", "主线节点-市场订单", "完成至少 1 次市场板订单", 4, IFE残片, IFE残片, 400,
                     () => MarketBoardManager.TotalCompletedOfferCount >= 1,
                     () => GetCountProgressText("主线统计-市场订单", MarketBoardManager.TotalCompletedOfferCount, 1)),
                 Node("resource-fragment", "主线节点-残片兑换", "完成至少 1 次残片兑换", 5, IFE残片, IFE残片, 400,
                     () => FragmentExchangeManager.TotalExchangeCount >= 1,
                     () => GetCountProgressText("主线统计-残片兑换", FragmentExchangeManager.TotalExchangeCount, 1))),
+            Branch("recurring-entry", "循环任务入门",
+                Node("recurring-first", "首次循环", "领取第 1 次循环任务奖励", 2, IFE残片, IFE残片, 200,
+                    () => RecurringTask.TotalClaimedCount >= 1,
+                    () => GetCountProgressText("主线统计-循环任务", RecurringTask.TotalClaimedCount, 1)),
+                Node("recurring-five", "循环五次", "累计领取 5 次循环任务奖励", 3, IFE残片, IFE残片, 300,
+                    () => RecurringTask.TotalClaimedCount >= 5,
+                    () => GetCountProgressText("主线统计-循环任务", RecurringTask.TotalClaimedCount, 5)),
+                Node("recurring-all-types", "六类循环", "六类循环任务各领取至少 1 次", 4, IFE残片, IFE残片, 500,
+                    () => RecurringTask.HasClaimedAllTaskTypes, () => GetRecurringTypeProgressText())),
             Branch("darkfog-early", "黑雾早期",
                 Node("darkfog-matrix", "黑雾矩阵", "持有或解锁黑雾矩阵", 7, I黑雾矩阵, I黑雾矩阵, 2,
                     () => GameMain.history != null
@@ -476,7 +491,7 @@ public static class MainTask {
         bool opening, int rewardCount) {
         return Node(id, name, desc, stageIndex, iconItemId, IFE残片, rewardCount,
             () => GetDrawCount(opening) >= target,
-            () => GetCountProgressText(opening ? "主线统计-路线偏好抽取" : "主线统计-原胚偏好抽取", GetDrawCount(opening), target));
+            () => GetCountProgressText(opening ? "主线统计-开线抽取" : "主线统计-原胚抽取", GetDrawCount(opening), target));
     }
 
     private static TaskNode ProtoNode(string id, string name, string desc, int stageIndex, int iconItemId,
@@ -515,18 +530,19 @@ public static class MainTask {
 
     private static int GetMaxBuildingLevel() {
         return Math.Max(InteractionTower.Level, Math.Max(MineralReplicationTower.Level,
-            Math.Max(ConversionTower.Level, RectificationTower.Level)));
+            Math.Max(PointAggregateTower.Level, Math.Max(ConversionTower.Level, RectificationTower.Level))));
     }
 
     private static int GetMinBuildingLevel() {
         return Math.Min(InteractionTower.Level, Math.Min(MineralReplicationTower.Level,
-            Math.Min(ConversionTower.Level, RectificationTower.Level)));
+            Math.Min(PointAggregateTower.Level, Math.Min(ConversionTower.Level, RectificationTower.Level))));
     }
 
     private static int GetProtoTypeCount() {
         int count = 0;
         if (GetItemTotalCount(IFE交互塔原胚) > 0) count++;
         if (GetItemTotalCount(IFE矿物复制塔原胚) > 0) count++;
+        if (GetItemTotalCount(IFE点数聚集塔原胚) > 0) count++;
         if (GetItemTotalCount(IFE转化塔原胚) > 0) count++;
         if (GetItemTotalCount(IFE精馏塔原胚) > 0) count++;
         if (GetItemTotalCount(IFE分馏塔定向原胚) > 0) count++;
@@ -534,7 +550,13 @@ public static class MainTask {
     }
 
     private static int GetUploadedBuildingTypeCount() {
-        return GetSacrificedTowerTypeCount();
+        int count = 0;
+        if (GetItemTotalCount(IFE交互塔) > 0) count++;
+        if (GetItemTotalCount(IFE矿物复制塔) > 0) count++;
+        if (GetItemTotalCount(IFE点数聚集塔) > 0) count++;
+        if (GetItemTotalCount(IFE转化塔) > 0) count++;
+        if (GetItemTotalCount(IFE精馏塔) > 0) count++;
+        return count;
     }
 
     private static long GetDrawCount(bool opening) {
@@ -562,7 +584,7 @@ public static class MainTask {
     }
 
     private static string GetMinBuildingLevelProgressText(int targetLevel) {
-        return $"{"四塔最低等级".Translate()}：{GetMinBuildingLevel()}/{targetLevel}";
+        return $"{"五塔最低等级".Translate()}：{GetMinBuildingLevel()}/{targetLevel}";
     }
 
     private static string GetRecipeProgressText(int targetCount) {
@@ -576,6 +598,10 @@ public static class MainTask {
     private static string GetFocusProgressText() {
         return
             $"{"聚焦流派".Translate()}：{(CurrentFocus == GachaFocusType.Balanced ? "否".Translate() : "是".Translate())}";
+    }
+
+    private static string GetRecurringTypeProgressText() {
+        return $"{"循环类型".Translate()}：{RecurringTask.ClaimedTaskTypeCount}/6";
     }
 
     private static string GetDarkFogStageProgressText(EDarkFogCombatStage targetStage) {
@@ -595,10 +621,10 @@ public static class MainTask {
 
     private static bool[][][] completedByMode;
     private static bool[][][] rewardedByMode;
-    private static bool[][] stageMemoryRewardedByMode;
     private static int[] selectedBranchByMode = [-1, -1];
     private static int[] selectedNodeByMode = [-1, -1];
     private static int _lastGlobalTickFrame = -1;
+    private static readonly List<(int itemId, int count)> _rewardCardQueue = [];
     private static readonly string[][] LegacyStageNodeIdsByMode = [
         [
             "normal-tech-data",
@@ -633,10 +659,8 @@ public static class MainTask {
     private static void EnsureRouteState() {
         completedByMode ??= CreateStateMatrix();
         rewardedByMode ??= CreateStateMatrix();
-        stageMemoryRewardedByMode ??= CreateStageRewardMatrix();
         ResizeStateMatrix(ref completedByMode);
         ResizeStateMatrix(ref rewardedByMode);
-        ResizeStageRewardMatrix(ref stageMemoryRewardedByMode);
     }
 
     private static bool[][][] CreateStateMatrix() {
@@ -647,14 +671,6 @@ public static class MainTask {
             for (int branchIndex = 0; branchIndex < route.Branches.Length; branchIndex++) {
                 matrix[modeIndex][branchIndex] = new bool[route.Branches[branchIndex].Nodes.Length];
             }
-        }
-        return matrix;
-    }
-
-    private static bool[][] CreateStageRewardMatrix() {
-        bool[][] matrix = new bool[RouteMaps.Length][];
-        for (int modeIndex = 0; modeIndex < RouteMaps.Length; modeIndex++) {
-            matrix[modeIndex] = new bool[MainStages.Length];
         }
         return matrix;
     }
@@ -696,28 +712,9 @@ public static class MainTask {
         }
     }
 
-    private static void ResizeStageRewardMatrix(ref bool[][] matrix) {
-        if (matrix == null || matrix.Length != RouteMaps.Length) {
-            matrix = CreateStageRewardMatrix();
-            return;
-        }
-
-        for (int modeIndex = 0; modeIndex < RouteMaps.Length; modeIndex++) {
-            if (matrix[modeIndex] != null && matrix[modeIndex].Length == MainStages.Length) {
-                continue;
-            }
-            bool[] oldStages = matrix[modeIndex];
-            matrix[modeIndex] = new bool[MainStages.Length];
-            if (oldStages != null) {
-                Array.Copy(oldStages, matrix[modeIndex], Math.Min(oldStages.Length, MainStages.Length));
-            }
-        }
-    }
-
     private static void ResetRouteState() {
         completedByMode = CreateStateMatrix();
         rewardedByMode = CreateStateMatrix();
-        stageMemoryRewardedByMode = CreateStageRewardMatrix();
         selectedBranchByMode = [-1, -1];
         selectedNodeByMode = [-1, -1];
         _lastGlobalTickFrame = -1;
@@ -740,7 +737,7 @@ public static class MainTask {
     }
 
     public static void Tick() {
-        if (Time.frameCount == _lastGlobalTickFrame) {
+        if (Mathf.Abs(Time.frameCount - _lastGlobalTickFrame) < 30) {
             return;
         }
         _lastGlobalTickFrame = Time.frameCount;
@@ -750,6 +747,13 @@ public static class MainTask {
 
         RefreshRouteProgress(showPopup: true);
         GrantPendingRewards(showPopup: true);
+
+        // 每 Tick 弹一张奖励卡，避免集中创建 3D 模型导致卡顿
+        if (_rewardCardQueue.Count > 0) {
+            var (itemId, count) = _rewardCardQueue[0];
+            _rewardCardQueue.RemoveAt(0);
+            UIItemup.Up(itemId, count);
+        }
     }
 
     private static void RefreshRouteProgress(bool showPopup, bool allowRewardGrant = true) {
@@ -814,7 +818,7 @@ public static class MainTask {
         if (node.RewardItemId > 0 && node.RewardCount > 0) {
             AddItemToModData(node.RewardItemId, node.RewardCount, 0, true);
             if (showPopup && CanShowItemupTip()) {
-                UIItemup.Up(node.RewardItemId, node.RewardCount);
+                _rewardCardQueue.Add((node.RewardItemId, node.RewardCount));
             }
         }
         rewardedByMode[modeIndex][branchIndex][nodeIndex] = true;
@@ -823,7 +827,6 @@ public static class MainTask {
             UIRealtimeTip.Popup(string.Format("主线里程碑达成提示".Translate(), node.Name.Translate()), true,
                 GetMainTaskRewardTipId());
         }
-        GrantCompletedStageMemoryRewards(modeIndex, showPopup, allowRewardGrant);
     }
 
     private static void GrantPendingRewards(bool showPopup) {
@@ -840,75 +843,6 @@ public static class MainTask {
                 }
             }
         }
-        for (int modeIndex = 0; modeIndex < RouteMaps.Length; modeIndex++) {
-            GrantCompletedStageMemoryRewards(modeIndex, showPopup, allowRewardGrant: true);
-        }
-    }
-
-    private static void GrantCompletedStageMemoryRewards(int modeIndex, bool showPopup, bool allowRewardGrant) {
-        if (!allowRewardGrant || modeIndex < 0 || modeIndex >= RouteMaps.Length) {
-            return;
-        }
-        RouteMap route = GetRouteByModeIndex(modeIndex);
-        for (int stageIndex = 0; stageIndex < MainStages.Length; stageIndex++) {
-            if (stageMemoryRewardedByMode[modeIndex][stageIndex]
-                || !IsStageFullyCompleted(route, modeIndex, stageIndex)) {
-                continue;
-            }
-
-            int memoryCount = GetStageMemoryRewardCount(stageIndex, modeIndex);
-            if (memoryCount <= 0) {
-                continue;
-            }
-
-            AddItemToModData(IFE记忆源点, memoryCount, 0, true);
-            if (showPopup && CanShowItemupTip()) {
-                UIItemup.Up(IFE记忆源点, memoryCount);
-            }
-            stageMemoryRewardedByMode[modeIndex][stageIndex] = true;
-            if (showPopup && CanShowRealtimeTip()) {
-                UIRealtimeTip.Popup(
-                    string.Format("主线阶段完成提示".Translate(), MainStages[stageIndex].Name.Translate()), true,
-                    GetMainTaskRewardTipId());
-            }
-        }
-    }
-
-    private static bool IsStageFullyCompleted(RouteMap route, int modeIndex, int stageIndex) {
-        bool hasStageNode = false;
-        for (int branchIndex = 0; branchIndex < route.Branches.Length; branchIndex++) {
-            TaskNode[] nodes = route.Branches[branchIndex].Nodes;
-            for (int nodeIndex = 0; nodeIndex < nodes.Length; nodeIndex++) {
-                if (nodes[nodeIndex].StageIndex != stageIndex) {
-                    continue;
-                }
-                hasStageNode = true;
-                if (!completedByMode[modeIndex][branchIndex][nodeIndex]) {
-                    return false;
-                }
-            }
-        }
-        return hasStageNode;
-    }
-
-    private static int GetStageMemoryRewardCount(int stageIndex, string modeName) {
-        if (stageIndex <= 0 || stageIndex >= 7) {
-            return 0;
-        }
-        int baseCount = stageIndex switch {
-            1 => 1,
-            2 => 1,
-            3 => 2,
-            4 => 2,
-            5 => 3,
-            6 => 4,
-            _ => 0,
-        };
-        return modeName == "速通主线" ? Math.Max(1, baseCount - 1) : baseCount;
-    }
-
-    private static int GetStageMemoryRewardCount(int stageIndex, int modeIndex) {
-        return GetStageMemoryRewardCount(stageIndex, GetRouteByModeIndex(modeIndex).CenterTitle);
     }
 
     private static void EnsureSelectedNode(int modeIndex) {
@@ -1068,8 +1002,7 @@ public static class MainTask {
             ("NodeRewardedStates", br => {
                 ReadStateMatrix(br, rewardedByMode);
                 loadedRewardedState = true;
-            }),
-            ("StageMemoryRewardedStates", br => ReadStageRewardMatrix(br, stageMemoryRewardedByMode))
+            })
         );
 
         bool isLegacyImport = !loadedCompletedState || !loadedRewardedState;
@@ -1112,8 +1045,7 @@ public static class MainTask {
                 bw.Write(legacySpeedrunRewardClaimed);
             }),
             ("NodeCompletedStates", bw => WriteStateMatrix(bw, completedByMode)),
-            ("NodeRewardedStates", bw => WriteStateMatrix(bw, rewardedByMode)),
-            ("StageMemoryRewardedStates", bw => WriteStageRewardMatrix(bw, stageMemoryRewardedByMode))
+            ("NodeRewardedStates", bw => WriteStateMatrix(bw, rewardedByMode))
         );
     }
 
@@ -1134,71 +1066,22 @@ public static class MainTask {
         }
     }
 
-    private static void WriteStageRewardMatrix(BinaryWriter w, bool[][] matrix) {
-        w.Write(matrix.Length);
-        for (int modeIndex = 0; modeIndex < matrix.Length; modeIndex++) {
-            w.Write(matrix[modeIndex].Length);
-            for (int stageIndex = 0; stageIndex < matrix[modeIndex].Length; stageIndex++) {
-                w.Write(matrix[modeIndex][stageIndex]);
-            }
-        }
-    }
-
     private static void ReadStateMatrix(BinaryReader r, bool[][][] matrix) {
         int modeCount = r.ReadInt32();
         for (int modeIndex = 0; modeIndex < modeCount; modeIndex++) {
             int branchCount = r.ReadInt32();
             for (int branchIndex = 0; branchIndex < branchCount; branchIndex++) {
                 int nodeCount = r.ReadInt32();
-                int targetBranchIndex = MapSavedBranchIndex(modeIndex, branchIndex, branchCount);
                 for (int nodeIndex = 0; nodeIndex < nodeCount; nodeIndex++) {
                     bool value = r.ReadBoolean();
                     if (modeIndex < matrix.Length
-                        && targetBranchIndex >= 0
-                        && targetBranchIndex < matrix[modeIndex].Length
-                        && nodeIndex < matrix[modeIndex][targetBranchIndex].Length) {
-                        matrix[modeIndex][targetBranchIndex][nodeIndex] = value;
+                        && branchIndex < matrix[modeIndex].Length
+                        && nodeIndex < matrix[modeIndex][branchIndex].Length) {
+                        matrix[modeIndex][branchIndex][nodeIndex] = value;
                     }
                 }
             }
         }
-    }
-
-    private static void ReadStageRewardMatrix(BinaryReader r, bool[][] matrix) {
-        int modeCount = r.ReadInt32();
-        for (int modeIndex = 0; modeIndex < modeCount; modeIndex++) {
-            int stageCount = r.ReadInt32();
-            for (int stageIndex = 0; stageIndex < stageCount; stageIndex++) {
-                bool value = r.ReadBoolean();
-                if (modeIndex < matrix.Length && stageIndex < matrix[modeIndex].Length) {
-                    matrix[modeIndex][stageIndex] = value;
-                }
-            }
-        }
-    }
-
-    private static int MapSavedBranchIndex(int modeIndex, int savedBranchIndex, int savedBranchCount) {
-        if (modeIndex >= RouteMaps.Length) {
-            return -1;
-        }
-
-        RouteMap route = GetRouteByModeIndex(modeIndex);
-        if (savedBranchCount <= route.Branches.Length) {
-            return savedBranchIndex < route.Branches.Length ? savedBranchIndex : -1;
-        }
-
-        int removedBefore = 0;
-        for (int oldBranchIndex = 0; oldBranchIndex <= savedBranchIndex; oldBranchIndex++) {
-            if (IsRemovedLegacyBranchIndex(oldBranchIndex)) {
-                removedBefore++;
-            }
-        }
-        int mappedIndex = savedBranchIndex - removedBefore;
-        return mappedIndex >= 0 && mappedIndex < route.Branches.Length ? mappedIndex : -1;
-    }
-
-    private static bool IsRemovedLegacyBranchIndex(int oldBranchIndex) {
-        return oldBranchIndex == 8;
     }
 
     private static void ApplyLegacyProgress(int[] currentStageByModeLegacy, bool[] rewardClaimedByModeLegacy) {
@@ -1664,7 +1547,7 @@ public static class MainTask {
         int nodeIndex) {
         RouteMap route = GetRouteByModeIndex(modeIndex);
         string progressText = GetNodeProgressText(modeIndex, branchIndex, nodeIndex);
-        string rewardText = GetRewardText(node, route.CenterTitle);
+        string rewardText = GetRewardText(node);
         string stageName = route.Stages[Math.Max(0, Math.Min(route.Stages.Length - 1, node.StageIndex))].Name
             .Translate();
 
@@ -1700,14 +1583,9 @@ public static class MainTask {
         };
     }
 
-    private static string GetRewardText(TaskNode node, string modeName) {
+    private static string GetRewardText(TaskNode node) {
         if (node.RewardItemId > 0 && LDB.items.Exist(node.RewardItemId)) {
-            string rewardText = $"{LDB.items.Select(node.RewardItemId).name} x{node.RewardCount}";
-            int stageMemoryCount = GetStageMemoryRewardCount(node.StageIndex, modeName);
-            if (stageMemoryCount > 0) {
-                rewardText += $"\n{"节点详情-阶段奖励".Translate()} {LDB.items.Select(IFE记忆源点).name} x{stageMemoryCount}";
-            }
-            return rewardText;
+            return $"{LDB.items.Select(node.RewardItemId).name} x{node.RewardCount}";
         }
         return "无".Translate();
     }

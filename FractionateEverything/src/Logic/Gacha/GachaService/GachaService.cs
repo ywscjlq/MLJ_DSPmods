@@ -47,7 +47,6 @@ public enum GachaGrowthOfferKind {
     ItemGrant = 0,
     DarkFogCatchup = 1,
     DarkFogRecipeGrowth = 2,
-    EssenceCatalyst = 3,
 }
 
 /// <summary>
@@ -56,12 +55,10 @@ public enum GachaGrowthOfferKind {
 internal readonly struct GachaRewardResolution(
     GachaRewardType rewardType,
     int rewardItemId,
-    int rewardCount,
-    int displayItemId = 0) {
+    int rewardCount) {
     public GachaRewardType RewardType { get; } = rewardType;
     public int RewardItemId { get; } = rewardItemId;
     public int RewardCount { get; } = rewardCount;
-    public int DisplayItemId { get; } = displayItemId;
 }
 
 /// <summary>
@@ -72,9 +69,8 @@ public static partial class GachaService {
     private static readonly Random rng = new();
     private static readonly List<GachaPool> pools = [];
     private static readonly GachaPool[] poolsById = new GachaPool[GachaPool.PoolCount];
-    private static readonly Dictionary<int, GachaDrawUnit> recipeRewardIndex = [];
+    private static readonly Dictionary<int, BaseRecipe> recipeRewardIndex = [];
     private static int recipeRewardIndexRecipeCount;
-    private static bool isRebuildingRecipeRewardIndex;
 
     private static int cachedMatrixId;
     private static GachaFocusType cachedFocus = GachaFocusType.Balanced;

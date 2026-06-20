@@ -1,13 +1,13 @@
 # UI/MainPanel/DrawGrowth — 抽取与成长系统
 
-本目录负责 `抽取成长` 分类下的页面：主抽取、抽取偏好、成长规划、流派聚焦、资源统筹。原 `GetItemRecipe` 路径已废弃，本文件为当前权威子文档。
+本目录负责 `抽取成长` 分类下的页面：开线抽取、原胚抽取、成长规划、流派聚焦、资源统筹。原 `GetItemRecipe` 路径已废弃，本文件为当前权威子文档。
 
 ## 文件职责划分
 
 - **抽取页**
-  - `TicketRaffle.cs`：主抽取 UI，通过抽取偏好在路线方向与原胚方向之间切换，处理单抽、十抽、结果摘要与跳转按钮。
+  - `TicketRaffle.cs`：开线抽取 / 原胚抽取 UI，处理单抽、十抽、结果摘要与跳转按钮。
 - **成长页**
-  - `LimitedTimeStore.cs`：成长规划 / 流派聚焦 UI，消费成长积分并切换聚焦方向。
+  - `LimitedTimeStore.cs`：成长规划 / 流派聚焦 UI，消费成长池积分并切换聚焦方向。
 - **资源页**
   - `TicketExchange.cs`：矩阵与残片兑换、资源统筹入口。
 
@@ -15,7 +15,7 @@
 
 1. **跨页跳转**：本域页面切换统一调用 `MainWindow.NavigateToPage(MainWindowPageRegistry.DrawGrowthCategoryName, index)`。
 2. **状态同步**：
-   - 概率、保底进度、成长积分等核心逻辑状态**严禁**在 UI 层计算，必须通过 `Logic/Gacha`（如 `GachaService`）获取。
+   - 概率、保底进度、池积分等核心逻辑状态**严禁**在 UI 层计算，必须通过 `Logic/Gacha`（如 `GachaService`）获取。
    - 跨面板共享状态（如总抽卡次数）存储在 `MainWindow.SharedPanelState`。
 3. **配方获取路径**：
    - 科技奖励：`TechManager` 在关键科技解锁时直接奖励部分配方。

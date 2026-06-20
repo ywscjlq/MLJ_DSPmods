@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 using FE.Logic.Fractionation.Fractionators;
-using FE.Logic.Progression;
+using UnityEngine;
 using static FE.Utils.Utils;
 
 namespace FE.Logic.Fractionation.Process;
@@ -11,69 +11,59 @@ namespace FE.Logic.Fractionation.Process;
 /// </summary>
 public static partial class ProcessManager {
     // partial 类跨文件静态字段初始化顺序不稳定，不能用另一个文件里的 handler 数组决定长度。
-    private const int FractionatorBuildingTypeCount = 4;
-    /// <summary>
-    /// 获取该规则或快照允许的最高等级。
-    /// </summary>
+    private const int FractionatorBuildingTypeCount = IFE精馏塔 - IFE交互塔 + 1;
+    /// <summary>原版分馏塔最大堆叠数（vanilla max stack），作为运行参数兜底倍率</summary>
+    private const int VanillaFractionatorMaxStack = 12;
+    /// <summary>流动输出缓存为产物输出的 1/4</summary>
+    private const int FluidOutputRatioDivisor = 4;
+
     public static readonly int MaxLevel = 12;
-    /// <summary>
-    /// 保存按建筑等级索引的输入保留加成表。
-    /// </summary>
     public static readonly float[] ReinforcementBonusArr = new float[MaxLevel + 1];
-    /// <summary>
-    /// 保存按建筑等级索引的额外成功率加成表。
-    /// </summary>
     public static readonly float[] ReinforcementSuccessRatioArr = new float[MaxLevel + 1];
     private static double[] incTableFixedRatio = [];
-    /// <summary>
-    /// 定义分馏塔流动输出缓存的基础上限。
-    /// </summary>
     public static int BaseFracFluidOutputMax = 20;
-    /// <summary>
-    /// 定义分馏塔产物输出缓存的基础上限。
-    /// </summary>
     public static int BaseFracProductOutputMax = 20;
-    /// <summary>
-    /// 定义分馏塔流动输入缓存的基础上限。
-    /// </summary>
     public static int BaseFracFluidInputCargoMax = 40;
-    /// <summary>
-    /// 定义热路径按传送带速度估算的最大输入速度。
-    /// </summary>
     public static int MaxBeltSpeed = 30;
+    [ThreadStatic]
+    public static float CurrentAffixSuccessBonus = 0f;  // 词缀成功率
+    [ThreadStatic]
+    public static float CurrentAffixCacheBonus = 0f;     // 词缀缓存加成
+    [ThreadStatic]
+    public static float CurrentAffixEnergyReduction = 0f; // 词缀节能
+    [ThreadStatic]
+    public static float CurrentAffixStackBonus = 0f;      // 词缀堆叠加成
+    [ThreadStatic]
+    public static float CurrentAffixChaosPenalty = 0f;    // 词缀混沌惩罚
+    [ThreadStatic]
+    public static float CurrentAdjacencyBonus = 0f;       // 建筑联动加成
+    [ThreadStatic]
+    public static float CurrentAffixRemainInputBonus = 0f;  // 流派冲突: 永动协议
+    [ThreadStatic]
+    public static float CurrentAffixAppendRatio = 1f;       // 流派冲突: 闭环工艺
 
     /// <summary>
     /// 单次分馏更新使用的运行参数快照。
     /// </summary>
-    private struct FractionatorRuntimeConfig {
-        /// <summary>
-        /// 读取该建筑当前允许的分馏处理堆叠上限。
-        /// </summary>
+    internal struct FractionatorRuntimeConfig {
         public int MaxStack;
-        /// <summary>
-        /// 保存该分馏塔运行配置允许缓存的产物输出上限。
-        /// </summary>
         public int ProductOutputMax;
-        /// <summary>
-        /// 保存该分馏塔运行配置允许缓存的流动输出上限。
-        /// </summary>
         public int FluidOutputMax;
-        /// <summary>
-        /// 读取该建筑当前增产点倍率。
-        /// </summary>
         public float PlrRatio;
-        /// <summary>
-        /// 保存该分馏塔类型当前获得的全局成功率加成。
-        /// </summary>
         public float SuccessBoost;
-        /// <summary>
-        /// 判断该建筑是否已启用流动输入增产加成。
-        /// </summary>
         public bool EnableFluidEnhancement;
     }
 
     private static readonly FractionatorRuntimeConfig[] runtimeConfigsByBuildingOffset =
         new FractionatorRuntimeConfig[FractionatorBuildingTypeCount];
+
+    // 词缀反馈缓存（按建筑类型ID存档，供 UI 线程精确读取，消除 ThreadStatic 竞态）
+    private static readonly System.Collections.Generic.Dictionary<int, CachedAffixFeedback> affixFeedbackCache = new();
+    internal struct CachedAffixFeedback { public float NetBoost; public float NetDelta; }
+
+    internal static CachedAffixFeedback GetAffixFeedback(int buildingID) {
+        return affixFeedbackCache.TryGetValue(buildingID, out var v) ? v : default;
+    }
 
     static ProcessManager() {
         //强化成功率
@@ -93,9 +83,6 @@ public static partial class ProcessManager {
         }
     }
 
-    /// <summary>
-    /// 初始化分馏运行热路径的配置表。
-    /// </summary>
     public static void Init() {
         //获取传送带的最大速度，以此决定循环的最大次数以及缓存区大小
         //游戏逻辑帧只有60，就算传送带再快，也只能取放一个槽位的物品，也就是最多4个，再多也取不到
@@ -108,8 +95,8 @@ public static partial class ProcessManager {
         float ratio = MaxBeltSpeed / 30.0f;
         PrefabDesc desc = LDB.models.Select(M分馏塔).prefabDesc;
         BaseFracFluidInputCargoMax = (int)(desc.fracFluidInputMax * ratio);
-        BaseFracProductOutputMax = (int)(desc.fracProductOutputMax * ratio);
-        BaseFracFluidOutputMax = (int)(desc.fracFluidOutputMax * ratio);
+        BaseFracProductOutputMax = (int)(desc.fracProductOutputMax * ratio * VanillaFractionatorMaxStack / FluidOutputRatioDivisor);
+        BaseFracFluidOutputMax = (int)(desc.fracFluidOutputMax * ratio * VanillaFractionatorMaxStack / FluidOutputRatioDivisor);
 
         // 增产剂表在游戏静态数据加载后才可靠，不能放到类型静态初始化阶段读取。
         incTableFixedRatio = new double[Cargo.incTableMilli.Length];
@@ -120,14 +107,13 @@ public static partial class ProcessManager {
         RefreshFractionatorRuntimeConfig();
     }
 
-    /// <summary>
-    /// 刷新分馏塔等级和配置派生出的运行参数。
-    /// </summary>
     public static void RefreshFractionatorRuntimeConfig() {
         SetRuntimeConfig(IFE交互塔, InteractionTower.MaxStack, InteractionTower.PlrRatio,
             InteractionTower.SuccessBoost, InteractionTower.EnableFluidEnhancement);
         SetRuntimeConfig(IFE矿物复制塔, MineralReplicationTower.MaxStack, MineralReplicationTower.PlrRatio,
             MineralReplicationTower.SuccessBoost, MineralReplicationTower.EnableFluidEnhancement);
+        SetRuntimeConfig(IFE点数聚集塔, PointAggregateTower.MaxStack, PointAggregateTower.PlrRatio,
+            PointAggregateTower.SuccessBoost, PointAggregateTower.EnableFluidEnhancement);
         SetRuntimeConfig(IFE转化塔, ConversionTower.MaxStack, ConversionTower.PlrRatio,
             ConversionTower.SuccessBoost, ConversionTower.EnableFluidEnhancement);
         SetRuntimeConfig(IFE精馏塔, RectificationTower.MaxStack, RectificationTower.PlrRatio,
@@ -137,36 +123,50 @@ public static partial class ProcessManager {
     private static void SetRuntimeConfig(int buildingID, int maxStack, float plrRatio, float successBoost,
         bool enableFluidEnhancement) {
 
-        int index = FractionatorTowerCatalog.GetActiveFractionatorIndex(buildingID);
+        int index = buildingID - IFE交互塔;
         if (index < 0 || index >= runtimeConfigsByBuildingOffset.Length) {
             return;
         }
         runtimeConfigsByBuildingOffset[index] = new FractionatorRuntimeConfig {
             MaxStack = maxStack,
             ProductOutputMax = BaseFracProductOutputMax * maxStack,
-            FluidOutputMax = BaseFracFluidOutputMax * Math.Max(1, maxStack / 4),
+            FluidOutputMax = BaseFracFluidOutputMax * Math.Max(1, maxStack / FluidOutputRatioDivisor),
             PlrRatio = plrRatio,
             SuccessBoost = successBoost,
             EnableFluidEnhancement = enableFluidEnhancement,
         };
     }
 
-    private static FractionatorRuntimeConfig GetRuntimeConfig(int buildingID) {
-        int index = FractionatorTowerCatalog.GetActiveFractionatorIndex(buildingID);
+    internal static FractionatorRuntimeConfig GetRuntimeConfig(int buildingID) {
+        int index = buildingID - IFE交互塔;
         if (index >= 0 && index < runtimeConfigsByBuildingOffset.Length) {
             FractionatorRuntimeConfig config = runtimeConfigsByBuildingOffset[index];
             if (config.MaxStack > 0) {
+                config.SuccessBoost += CurrentAffixSuccessBonus - CurrentAffixChaosPenalty + CurrentAdjacencyBonus;
+                config.MaxStack += (int)Math.Round(CurrentAffixStackBonus);
+                config.ProductOutputMax += (int)(config.ProductOutputMax * CurrentAffixCacheBonus);
+                config.FluidOutputMax += (int)(config.FluidOutputMax * CurrentAffixCacheBonus);
+                config.PlrRatio *= (1f + CurrentAffixEnergyReduction);  // 节能模式：降低等效功耗
+                // 为 UI 线程缓存当前词缀反馈值，消除 ThreadStatic 跨线程竞态
+                float netSuccess = CurrentAffixSuccessBonus + config.SuccessBoost - CurrentAffixChaosPenalty + CurrentAdjacencyBonus;
+                float cacheMult = 1f + CurrentAffixCacheBonus;
+                float successMult = 1f + netSuccess;
+                float stackMult = 1f + CurrentAffixStackBonus / Mathf.Max(1f, config.MaxStack);
+                float netBoost = 100f * cacheMult * successMult * stackMult;
+                float netDelta = ((1f + CurrentAffixCacheBonus) * (1f + CurrentAffixSuccessBonus - CurrentAffixChaosPenalty + CurrentAdjacencyBonus) * (1f + CurrentAffixStackBonus / Mathf.Max(1f, config.MaxStack)) - 1f) * 100f;
+                affixFeedbackCache[buildingID] = new CachedAffixFeedback { NetBoost = netBoost, NetDelta = netDelta };
                 return config;
             }
         }
 
-        return new FractionatorRuntimeConfig {
+        var fallback = new FractionatorRuntimeConfig {
             MaxStack = 3,
-            ProductOutputMax = BaseFracProductOutputMax * 3,
+            ProductOutputMax = BaseFracProductOutputMax * VanillaFractionatorMaxStack / FluidOutputRatioDivisor,
             FluidOutputMax = BaseFracFluidOutputMax,
             PlrRatio = 1.0f,
-            SuccessBoost = 0f,
+            SuccessBoost = CurrentAffixSuccessBonus - CurrentAffixChaosPenalty,
             EnableFluidEnhancement = false,
         };
+        return fallback;
     }
 }

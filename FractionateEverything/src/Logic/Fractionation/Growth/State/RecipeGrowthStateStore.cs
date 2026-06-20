@@ -10,9 +10,6 @@ namespace FE.Logic.Fractionation.Growth;
 public sealed class RecipeGrowthStateStore {
     private readonly Dictionary<RecipeKey, RecipeGrowthState> states = [];
 
-    /// <summary>
-    /// 获取 OrCreate 对应的分馏域数据。
-    /// </summary>
     public RecipeGrowthState GetOrCreate(BaseRecipe recipe) {
         RecipeKey key = RecipeKey.FromRecipe(recipe);
         if (!states.TryGetValue(key, out RecipeGrowthState state)) {
@@ -25,9 +22,6 @@ public sealed class RecipeGrowthStateStore {
         return state;
     }
 
-    /// <summary>
-    /// 从存档读取该分馏域状态。
-    /// </summary>
     public void Import(BinaryReader r) {
         states.Clear();
         int count = r.ReadInt32();
@@ -59,9 +53,6 @@ public sealed class RecipeGrowthStateStore {
         }
     }
 
-    /// <summary>
-    /// 将该分馏域状态写入存档。
-    /// </summary>
     public void Export(BinaryWriter w) {
         w.Write(states.Count);
         foreach (KeyValuePair<RecipeKey, RecipeGrowthState> pair in states) {
@@ -77,9 +68,6 @@ public sealed class RecipeGrowthStateStore {
         }
     }
 
-    /// <summary>
-    /// 切换或进入其他存档时重置该分馏域状态。
-    /// </summary>
     public void IntoOtherSave() {
         states.Clear();
     }

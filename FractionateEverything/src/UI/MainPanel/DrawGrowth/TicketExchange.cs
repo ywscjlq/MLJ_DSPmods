@@ -39,8 +39,8 @@ public static class TicketExchange {
         Register("抽取总览说明",
             "Review draw costs, current resources, focus switch costs and Dark Fog branch progress.",
             "查看抽取成本、当前资源、聚焦切换成本与黑雾支线进度。");
-        Register("开线偏好成本", "Route Preference Cost", "路线偏好成本");
-        Register("原胚偏好成本", "Proto Preference Cost");
+        Register("开线池成本", "Opening Pool Cost");
+        Register("原胚池成本", "Proto Pool Cost");
         Register("聚焦切换成本", "Focus Switch Cost");
         Register("黑雾支线说明", "Dark Fog Branch", "黑雾支线");
         Register("前往成长规划", "Go Growth Planning");
@@ -119,7 +119,7 @@ public static class TicketExchange {
                         children: [
                             ButtonNode("前往成长规划",
                                 onClick: () =>
-                                    MainWindow.NavigateToPage(MainWindowPageRegistry.DrawGrowthCategoryName, 1),
+                                    MainWindow.NavigateToPage(MainWindowPageRegistry.DrawGrowthCategoryName, 2),
                                 pos: (0, 0), objectName: "ticket-exchange-go-growth"),
                             ButtonNode("前往市场板",
                                 onClick: () =>
@@ -147,11 +147,11 @@ public static class TicketExchange {
         txtDarkFogTitle.text = "黑雾支线说明".Translate().WithColor(Orange);
         txtMode.text = $"当前模式：{GachaService.GetModeNameKey().Translate()}";
         txtCostOpening.text =
-            $"{"开线偏好成本".Translate()}：x{GachaService.GetDrawMatrixCost(GachaPool.PoolIdOpeningLine, 1)} / 抽";
+            $"{"开线池成本".Translate()}：x{GachaService.GetDrawMatrixCost(GachaPool.PoolIdOpeningLine, 1)} / 抽";
         txtCostProto.text =
-            $"{"原胚偏好成本".Translate()}：x{GachaService.GetDrawMatrixCost(GachaPool.PoolIdProtoLoop, 1)} / 抽";
+            $"{"原胚池成本".Translate()}：x{GachaService.GetDrawMatrixCost(GachaPool.PoolIdProtoLoop, 1)} / 抽";
         txtCostFocus.text =
-            $"{"聚焦切换成本".Translate()}：残片 x{GachaService.GetFocusSwitchFragmentCost(GachaFocusType.MineralExpansion)} 起    成长积分统一进入成长规划";
+            $"{"聚焦切换成本".Translate()}：残片 x{GachaService.GetFocusSwitchFragmentCost(GachaFocusType.MineralExpansion)} 起    成长积分统一进入成长池";
         txtDarkFogStatus.text = BuildDarkFogStatusText();
     }
 
@@ -187,7 +187,7 @@ public static class TicketExchange {
 
         return $"{"黑雾支线说明".Translate()}：阶段 {stageName}\n"
                + $"战况：地面基地 {DarkFogCombatManager.GetAliveGroundBaseCount()}    星域蜂巢 {DarkFogCombatManager.GetAliveHiveCount()}    物资层级 {DarkFogCombatManager.GetDarkFogResourceTier()}/4\n"
-               + $"成长规划报价 {GachaService.GetDarkFogGrowthOfferCount()} 项    黑雾配方 {unlockedRecipes}/{totalRecipes} 已解锁，满级 {maxedRecipes}    增强层 {enhancedText}\n"
+               + $"成长页报价 {DarkFogCombatManager.GetUnlockedGrowthOfferCount()} 项    市场板特单 {DarkFogCombatManager.GetUnlockedSpecialOrderCount()} 条    黑雾配方 {unlockedRecipes}/{totalRecipes} 已解锁，满级 {maxedRecipes}    增强层 {enhancedText}\n"
                + $"下一阶段：{nextTarget}";
     }
 

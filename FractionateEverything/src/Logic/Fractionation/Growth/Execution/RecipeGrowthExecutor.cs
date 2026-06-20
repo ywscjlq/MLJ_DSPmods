@@ -1,6 +1,5 @@
 using FE.Logic.Fractionation.FracRecipes;
 using FE.Logic.Gacha;
-using static FE.Logic.Items.ItemManager;
 using static FE.Logic.DataCenter.PlayerInventoryAccess;
 
 namespace FE.Logic.Fractionation.Growth;
@@ -9,9 +8,6 @@ namespace FE.Logic.Fractionation.Growth;
 /// 配方解锁、抽取重复和加工经验的成长执行逻辑。
 /// </summary>
 public static class RecipeGrowthExecutor {
-    /// <summary>
-    /// 按科技进度确保配方达到最低解锁等级。
-    /// </summary>
     public static RecipeGrowthResult EnsureUnlockedByTech(BaseRecipe recipe, RecipeGrowthContext context) {
         RecipeGrowthState state = RecipeGrowthManager.Store.GetOrCreate(recipe);
         RecipeGrowthRule rule = RecipeGrowthRules.GetRule(recipe);
@@ -25,14 +21,11 @@ public static class RecipeGrowthExecutor {
         return BuildResult(recipe, rule, previousLevel, state);
     }
 
-    /// <summary>
-    /// 按黑雾掉落进度确保配方达到最低解锁等级。
-    /// </summary>
     public static RecipeGrowthResult EnsureUnlockedByDarkFogDrop(BaseRecipe recipe, RecipeGrowthContext context) {
         RecipeGrowthState state = RecipeGrowthManager.Store.GetOrCreate(recipe);
         RecipeGrowthRule rule = RecipeGrowthRules.GetRule(recipe);
         int previousLevel = state.Level;
-        if (rule.Family is not RecipeFamily.MineralCopyDarkFog and not RecipeFamily.ConversionDarkFogChain) {
+        if (rule.Family is not RecipeFamily.MineralCopyDarkFog and not RecipeFamily.ConversionMaterialDarkFog) {
             return BuildResult(recipe, rule, previousLevel, state);
         }
 
@@ -46,9 +39,6 @@ public static class RecipeGrowthExecutor {
         return BuildResult(recipe, rule, previousLevel, state);
     }
 
-    /// <summary>
-    /// 应用 DrawReward 对应的分馏域状态变更。
-    /// </summary>
     public static RecipeGrowthResult ApplyDrawReward(BaseRecipe recipe, RecipeGrowthContext context) {
         RecipeGrowthState state = RecipeGrowthManager.Store.GetOrCreate(recipe);
         RecipeGrowthRule rule = RecipeGrowthRules.GetRule(recipe);
@@ -56,7 +46,7 @@ public static class RecipeGrowthExecutor {
         int fragmentReward = 0;
 
         if (state.Level >= rule.MaxLevel) {
-            fragmentReward = context.CurrentFocus == GachaFocusType.RectificationEconomy ?
+            fragmentReward = context.CurrentFocus == GachaFocusType.ConversionLeap ?
                 context.IsSpeedrunMode ? 35 : 20 :
                 context.IsSpeedrunMode ? 25 : 15;
             return new RecipeGrowthResult(previousLevel, state.Level, previousLevel > 0, previousLevel > 0,
@@ -67,8 +57,6 @@ public static class RecipeGrowthExecutor {
             state.Level = rule.FixedMaxReward
                 ? rule.MaxLevel
                 : RecipeGrowthRules.ClampLevel(rule, rule.DrawUnlockLevel);
-        } else if (rule.UsesGrowthExp || rule.UsesPity) {
-            ApplyManualCatchupProgress(state, rule, context);
         } else {
             state.Level = rule.FixedMaxReward ? rule.MaxLevel : RecipeGrowthRules.ClampLevel(rule, state.Level + 1);
         }
@@ -78,9 +66,6 @@ public static class RecipeGrowthExecutor {
         return BuildResult(recipe, rule, previousLevel, state, fragmentReward);
     }
 
-    /// <summary>
-    /// 应用分馏加工带来的配方成长经验。
-    /// </summary>
     public static RecipeGrowthResult ApplyProcessingProgress(BaseRecipe recipe, int inputCount, int successCount,
         RecipeGrowthContext context) {
         RecipeGrowthState state = RecipeGrowthManager.Store.GetOrCreate(recipe);
@@ -100,13 +85,8 @@ public static class RecipeGrowthExecutor {
                 gain += successCount * 4;
                 state.GrowthExp += gain;
                 break;
-            case RecipeFamily.MineralCopyNormal:
-            case RecipeFamily.ConversionItemChain:
-                gain += successCount * 2;
-                state.GrowthExp += gain;
-                break;
             case RecipeFamily.MineralCopyDarkFog:
-            case RecipeFamily.ConversionDarkFogChain:
+            case RecipeFamily.ConversionMaterialDarkFog:
                 gain += successCount * 2;
                 state.GrowthExp += RecipeGrowthCatchup.GetAdjustedDarkFogProcessExp(recipe, gain, context);
                 break;
@@ -115,7 +95,21 @@ public static class RecipeGrowthExecutor {
                 break;
         }
 
-        TryUpgradeByAccumulatedProgress(state, rule);
+        while (state.Level < rule.MaxLevel) {
+            int threshold = RecipeGrowthRules.GetUpgradeThreshold(rule, state.Level);
+            if (rule.UsesPity) {
+                if (state.PityProgress < threshold) {
+                    break;
+                }
+                state.PityProgress -= threshold;
+            } else {
+                if (state.GrowthExp < threshold) {
+                    break;
+                }
+                state.GrowthExp -= threshold;
+            }
+            state.Level++;
+        }
 
         if (state.Level != previousLevel || gain > 0) {
             state.UnlockSourceFlags |= RecipeUnlockSourceFlags.Processing;
@@ -136,13 +130,11 @@ public static class RecipeGrowthExecutor {
 
         switch (rule.Family) {
             case RecipeFamily.MineralCopyDarkFog:
-            case RecipeFamily.ConversionDarkFogChain:
+            case RecipeFamily.ConversionMaterialDarkFog:
                 state.GrowthExp += RecipeGrowthCatchup.GetAdjustedDarkFogCatchupExp(recipe, growthExp, context);
                 break;
             case RecipeFamily.BuildingTrainForward:
             case RecipeFamily.BuildingTrainReverse:
-            case RecipeFamily.MineralCopyNormal:
-            case RecipeFamily.ConversionItemChain:
                 state.GrowthExp += growthExp;
                 break;
             case RecipeFamily.Rectification:
@@ -152,15 +144,26 @@ public static class RecipeGrowthExecutor {
                 return BuildResult(recipe, rule, previousLevel, state);
         }
 
-        TryUpgradeByAccumulatedProgress(state, rule);
+        while (state.Level < rule.MaxLevel) {
+            int threshold = RecipeGrowthRules.GetUpgradeThreshold(rule, state.Level);
+            if (rule.UsesPity) {
+                if (state.PityProgress < threshold) {
+                    break;
+                }
+                state.PityProgress -= threshold;
+            } else {
+                if (state.GrowthExp < threshold) {
+                    break;
+                }
+                state.GrowthExp -= threshold;
+            }
+            state.Level++;
+        }
 
         state.LastTouchedTick = context.GameTick;
         return BuildResult(recipe, rule, previousLevel, state);
     }
 
-    /// <summary>
-    /// 应用 DarkFogCatchupByItem 对应的分馏域状态变更。
-    /// </summary>
     public static int ApplyDarkFogCatchupByItem(int itemId, int growthExp, RecipeGrowthContext context) {
         if (growthExp <= 0) {
             return 0;
@@ -170,7 +173,7 @@ public static class RecipeGrowthExecutor {
         foreach (BaseRecipe recipe in RecipeManager.AllRecipes) {
             RecipeFamily family = RecipeGrowthRules.GetFamily(recipe);
             if (recipe.InputID != itemId
-                || family is not RecipeFamily.MineralCopyDarkFog and not RecipeFamily.ConversionDarkFogChain) {
+                || family is not RecipeFamily.MineralCopyDarkFog and not RecipeFamily.ConversionMaterialDarkFog) {
                 continue;
             }
 
@@ -181,78 +184,6 @@ public static class RecipeGrowthExecutor {
             }
         }
         return affectedRecipes;
-    }
-
-    /// <summary>
-    /// 消耗矩阵精华催化同阶段及以下的精馏配方成长。
-    /// </summary>
-    public static int ApplyEssenceCatalyst(int essenceItemId, int growthExp, RecipeGrowthContext context) {
-        int catalystStage = GetMatrixEssenceLevel(essenceItemId);
-        if (catalystStage < 0 || growthExp <= 0) {
-            return 0;
-        }
-
-        int affectedRecipes = 0;
-        foreach (BaseRecipe recipe in RecipeManager.AllRecipes) {
-            if (RecipeGrowthRules.GetFamily(recipe) != RecipeFamily.Rectification
-                || GetMatrixStageIndex(recipe.MatrixID) > catalystStage
-                || !RecipeGrowthQueries.IsUnlocked(recipe)
-                || RecipeGrowthQueries.IsMaxed(recipe)) {
-                continue;
-            }
-
-            ApplyCatchupProgress(recipe, growthExp, context);
-            affectedRecipes++;
-        }
-        return affectedRecipes;
-    }
-
-    /// <summary>
-    /// 统计指定矩阵精华可催化的精馏配方数量。
-    /// </summary>
-    public static int CountEssenceCatalystTargets(int essenceItemId, bool requireMaxed) {
-        int catalystStage = GetMatrixEssenceLevel(essenceItemId);
-        if (catalystStage < 0) {
-            return 0;
-        }
-
-        int count = 0;
-        foreach (BaseRecipe recipe in RecipeManager.AllRecipes) {
-            if (RecipeGrowthRules.GetFamily(recipe) != RecipeFamily.Rectification
-                || GetMatrixStageIndex(recipe.MatrixID) > catalystStage
-                || !RecipeGrowthQueries.IsUnlocked(recipe)) {
-                continue;
-            }
-            bool isMaxed = RecipeGrowthQueries.IsMaxed(recipe);
-            if (requireMaxed && !isMaxed) {
-                return 0;
-            }
-            if (!requireMaxed && isMaxed) {
-                continue;
-            }
-            count++;
-        }
-        return count;
-    }
-
-    private static void ApplyManualCatchupProgress(RecipeGrowthState state, RecipeGrowthRule rule,
-        RecipeGrowthContext context) {
-        int threshold = RecipeGrowthRules.GetUpgradeThreshold(rule, state.Level);
-        if (threshold == int.MaxValue) {
-            return;
-        }
-
-        int gain = threshold * (context.IsSpeedrunMode ? 2 : 1) / 2;
-        if (gain <= 0) {
-            gain = 1;
-        }
-
-        if (rule.UsesPity) {
-            state.PityProgress += gain;
-        } else {
-            state.GrowthExp += gain;
-        }
-        TryUpgradeByAccumulatedProgress(state, rule);
     }
 
     public static RecipeGrowthResult
@@ -271,50 +202,32 @@ public static class RecipeGrowthExecutor {
         return BuildResult(recipe, rule, previousLevel, state);
     }
 
-    /// <summary>
-    /// 按科技进度确保配方达到最低解锁等级。
-    /// </summary>
     public static RecipeGrowthResult EnsureUnlockedByTech(RecipeKey key, RecipeGrowthContext context) {
         BaseRecipe recipe = RecipeManager.GetRecipe<BaseRecipe>(key.RecipeType, key.InputId);
         return recipe == null ? default : EnsureUnlockedByTech(recipe, context);
     }
 
-    /// <summary>
-    /// 应用 DrawReward 对应的分馏域状态变更。
-    /// </summary>
     public static RecipeGrowthResult ApplyDrawReward(RecipeKey key, RecipeGrowthContext context) {
         BaseRecipe recipe = RecipeManager.GetRecipe<BaseRecipe>(key.RecipeType, key.InputId);
         return recipe == null ? default : ApplyDrawReward(recipe, context);
     }
 
-    /// <summary>
-    /// 应用分馏加工带来的配方成长经验。
-    /// </summary>
     public static RecipeGrowthResult ApplyProcessingProgress(RecipeKey key, int inputCount, int successCount,
         RecipeGrowthContext context) {
         BaseRecipe recipe = RecipeManager.GetRecipe<BaseRecipe>(key.RecipeType, key.InputId);
         return recipe == null ? default : ApplyProcessingProgress(recipe, inputCount, successCount, context);
     }
 
-    /// <summary>
-    /// 按黑雾掉落进度确保配方达到最低解锁等级。
-    /// </summary>
     public static RecipeGrowthResult EnsureUnlockedByDarkFogDrop(RecipeKey key, RecipeGrowthContext context) {
         BaseRecipe recipe = RecipeManager.GetRecipe<BaseRecipe>(key.RecipeType, key.InputId);
         return recipe == null ? default : EnsureUnlockedByDarkFogDrop(recipe, context);
     }
 
-    /// <summary>
-    /// 应用黑雾追赶规则带来的配方成长经验。
-    /// </summary>
     public static RecipeGrowthResult ApplyCatchupProgress(RecipeKey key, int growthExp, RecipeGrowthContext context) {
         BaseRecipe recipe = RecipeManager.GetRecipe<BaseRecipe>(key.RecipeType, key.InputId);
         return recipe == null ? default : ApplyCatchupProgress(recipe, growthExp, context);
     }
 
-    /// <summary>
-    /// 在沙盒模式下直接设置配方等级。
-    /// </summary>
     public static RecipeGrowthResult SetLevelForSandbox(RecipeKey key, int targetLevel, RecipeGrowthContext context) {
         BaseRecipe recipe = RecipeManager.GetRecipe<BaseRecipe>(key.RecipeType, key.InputId);
         return recipe == null ? default : SetLevelForSandbox(recipe, targetLevel, context);
@@ -330,27 +243,5 @@ public static class RecipeGrowthExecutor {
         bool isMaxed = state.Level >= rule.MaxLevel;
         return new RecipeGrowthResult(previousLevel, state.Level, wasUnlocked, isUnlocked, isMaxed,
             previousLevel != state.Level, fragmentReward);
-    }
-
-    private static void TryUpgradeByAccumulatedProgress(RecipeGrowthState state, RecipeGrowthRule rule) {
-        while (state.Level < rule.MaxLevel) {
-            int threshold = RecipeGrowthRules.GetUpgradeThreshold(rule, state.Level);
-            if (threshold == int.MaxValue) {
-                break;
-            }
-
-            if (rule.UsesPity) {
-                if (state.PityProgress < threshold) {
-                    break;
-                }
-                state.PityProgress -= threshold;
-            } else {
-                if (state.GrowthExp < threshold) {
-                    break;
-                }
-                state.GrowthExp -= threshold;
-            }
-            state.Level++;
-        }
     }
 }

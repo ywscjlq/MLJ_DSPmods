@@ -1,5 +1,6 @@
 ﻿using FE.Logic.Buildings;
 using FE.Logic.Economy;
+using FE.Logic.Fractionation.Affix;
 using FE.Logic.Fractionation.Growth;
 using FE.Logic.Fractionation.Process;
 using FE.Logic.Fractionation.FracRecipes;
@@ -10,6 +11,7 @@ using FE.Logic.VanillaRecipes;
 using FE.UI.MainPanel;
 using FeUtils = FE.Utils.Utils;
 using static FE.Utils.Utils;
+using UnityEngine;
 
 namespace FE.Lifecycle;
 
@@ -35,7 +37,7 @@ public static class FeatureBootstrap {
     }
 
     public static void PreAddData() {
-        // 添加 3.0 主路径使用的核心物品与原胚
+        // 添加 2.3 主路径使用的核心物品与原胚
         ItemManager.AddCoreItemsAndPrototypes();
         // 初步添加分馏塔
         BuildingManager.AddFractionators();
@@ -43,7 +45,6 @@ public static class FeatureBootstrap {
         TechManager.AddTechs();
         // 添加指引手册
         TutorialManager.AddTutorials();
-        StackingManager.ApplyVanillaTechProtoOverrides();
     }
 
     public static void PostAddData() {
@@ -68,6 +69,7 @@ public static class FeatureBootstrap {
         ItemManager.ClassifyItemsToMatrix();
         // 动态经济系统依赖基础价值与矩阵阶段映射
         EconomyManager.Init();
+        AutoReplenishManager.Init();
         // UpdateHpAndEnergy 用到了 Init 生成的数据
         BuildingManager.UpdateHpAndEnergy();
         // SetFractionatorCacheSize 用到了 Init 生成的数据
@@ -78,6 +80,8 @@ public static class FeatureBootstrap {
         VanillaRecipeManager.AddVanillaRecipes();
         // CalculateItemModSaveCount 用到了 CalculateItemValues 生成的数据
         StationManager.CalculateItemModSaveCount();
+        // AutoReplenishManager 已统一由 EconomyManager.Tick() 驱动，此处无需手动创建
+
         finished = true;
     }
 

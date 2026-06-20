@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Reflection.Emit;
-using FE.Logic.Progression;
+using FE.Logic.Buildings;
+using FE.Logic.Fractionation.Fractionators;
 using HarmonyLib;
 using static FE.Utils.Utils;
 
@@ -81,11 +82,14 @@ public static partial class StationManager {
         return matcher.InstructionEnumeration();
     }
 
-    /// <summary>返回统一堆叠系统控制下的物流站输出集装上限。</summary>
+    /// <summary>根据交互站类型返回正确的集装上限</summary>
     /// <param name="factory">行星工厂实例</param>
     /// <param name="station">目标站点组件</param>
-    /// <returns>所有物流站统一使用当前堆叠上限。</returns>
+    /// <returns>自定义交互站使用强化堆叠，否则使用历史等级</returns>
     private static int GetOutputStack(PlanetFactory factory, StationComponent station) {
-        return StackingManager.GetLogisticStationMaxStack();
+        int buildingID = factory.entityPool[station.entityId].protoId;
+        return buildingID is IFE行星内物流交互站 or IFE星际物流交互站
+            ? LDB.items.Select(buildingID).MaxStack()
+            : GameMain.history.stationPilerLevel;
     }
 }

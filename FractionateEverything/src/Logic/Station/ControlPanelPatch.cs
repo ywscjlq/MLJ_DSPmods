@@ -606,15 +606,19 @@ public static partial class StationManager {
             return;
         }
 
+        // 修改集装输出的描述
+        Component label = __instance.techPilerButton.transform.Find("label");
+        Text text = label.GetComponent<Text>();
         // 只处理物流交互站
         int buildingID = __instance.factory.entityPool[station.entityId].protoId;
         if (!IsInteractionStation(buildingID)) {
-            RestoreStationPilerLabel(__instance.techPilerButton);
+            // 还原，避免不关窗口直接切换的时候显示错误
+            text.text = "  使用科技上限";
             __instance.event_lock = false;
             return;
         }
 
-        ApplyInteractionStationPilerLabel(__instance.techPilerButton);
+        text.text = "  使用强化上限";
         RefreshInteractionStationPilerUI(
             station,
             __instance.minPilerSlider,

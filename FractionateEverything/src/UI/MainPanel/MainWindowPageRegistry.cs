@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using FE.Logic.Items;
 using FE.UI.Foundation.Window;
 using FE.UI.MainPanel.Archive;
 using FE.UI.MainPanel.CoreOperate;
@@ -31,29 +32,39 @@ public static class MainWindowPageRegistry {
     ];
 
     private static readonly MainWindowPageDefinition[] allPages = [
+        // ── 生产管理（始终可见）──
         new(CoreOperateCategoryName, "分馏配方", FracRecipeOperate.CreateUI, FracRecipeOperate.UpdateUI),
-        new(CoreOperateCategoryName, "全局成长", GlobalGrowthOperate.CreateUI, GlobalGrowthOperate.UpdateUI),
         new(CoreOperateCategoryName, "原版配方", VanillaRecipeOperate.CreateUI, VanillaRecipeOperate.UpdateUI),
         new(CoreOperateCategoryName, "建筑操作", BuildingOperate.CreateUI, BuildingOperate.UpdateUI),
 
+        // ── 资源管理（分阶段解锁）──
         new(ResourceInteractionCategoryName, "物品交互", ItemInteraction.CreateUI, ItemInteraction.UpdateUI),
-        new(ResourceInteractionCategoryName, "市场总览", ResourceOverview.CreateUI, ResourceOverview.UpdateUI),
-        new(ResourceInteractionCategoryName, "限时订单", MarketBoard.CreateUI, MarketBoard.UpdateUI),
-        new(ResourceInteractionCategoryName, "市场指数", Exchange.CreateUI, Exchange.UpdateUI),
-        new(ResourceInteractionCategoryName, "稳定兑换", FragmentExchange.CreateUI, FragmentExchange.UpdateUI),
+        new(ResourceInteractionCategoryName, "市场总览", ResourceOverview.CreateUI, ResourceOverview.UpdateUI, minStageIndex: 2),
+        new(ResourceInteractionCategoryName, "市场板", MarketBoard.CreateUI, MarketBoard.UpdateUI, minStageIndex: 3),
+        new(ResourceInteractionCategoryName, "交易所", Exchange.CreateUI, Exchange.UpdateUI, minStageIndex: 2),
+        new(ResourceInteractionCategoryName, "残片兑换", FragmentExchange.CreateUI, FragmentExchange.UpdateUI),
 
-        new(DrawGrowthCategoryName, "主抽取", TicketRaffle.CreateMainDrawUI, TicketRaffle.UpdateUI),
-        new(DrawGrowthCategoryName, "成长规划", LimitedTimeStore.CreateRecipeUI, LimitedTimeStore.UpdateUI),
-        new(DrawGrowthCategoryName, "流派聚焦", LimitedTimeStore.CreateProtoUI, LimitedTimeStore.UpdateUI),
-        new(DrawGrowthCategoryName, "抽取总览", TicketExchange.CreateUI, TicketExchange.UpdateUI),
+        // ── 抽取成长（白糖后解锁）──
+        new(DrawGrowthCategoryName, "开线抽取", TicketRaffle.CreateRecipeUI, TicketRaffle.UpdateUI, minStageIndex: 5),
+        new(DrawGrowthCategoryName, "原胚抽取", TicketRaffle.CreateProtoUI, TicketRaffle.UpdateUI, minStageIndex: 5),
+        new(DrawGrowthCategoryName, "成长规划", LimitedTimeStore.CreateRecipeUI, LimitedTimeStore.UpdateUI, minStageIndex: 5),
+        new(DrawGrowthCategoryName, "流派聚焦", LimitedTimeStore.CreateProtoUI, LimitedTimeStore.UpdateUI, minStageIndex: 5),
+        new(DrawGrowthCategoryName, "抽取总览", TicketExchange.CreateUI, TicketExchange.UpdateUI, minStageIndex: 5),
 
+        // ── 任务成就（始终可见）──
         new(ProgressTaskCategoryName, "主线任务", MainTask.CreateUI, MainTask.UpdateUI),
+        new(ProgressTaskCategoryName, "循环任务", RecurringTask.CreateUI, RecurringTask.UpdateUI),
         new(ProgressTaskCategoryName, "成就系统", Achievements.CreateUI, Achievements.UpdateUI),
+        new(ProgressTaskCategoryName, "黑雾任务", DarkFogTasks.CreateUI, DarkFogTasks.UpdateUI, minStageIndex: 3),
 
+        // ── 图鉴档案（始终可见）──
         new(ArchiveCategoryName, "配方图鉴", RecipeGallery.CreateUI, RecipeGallery.UpdateUI),
         new(ArchiveCategoryName, "分馏统计", FracStatistic.CreateUI, FracStatistic.UpdateUI),
         new(ArchiveCategoryName, "开发日记", DevelopmentDiary.CreateUI, DevelopmentDiary.UpdateUI),
 
+        // ── 系统设置（始终可见）──
+        new(SystemSettingCategoryName, "系统仪表盘", DashboardPage.CreateUI, DashboardPage.UpdateUI),
+        new(SystemSettingCategoryName, "自动补货", AutoReplenishPage.CreateUI, AutoReplenishPage.UpdateUI),
         new(SystemSettingCategoryName, "杂项设置", Miscellaneous.CreateUI, Miscellaneous.UpdateUI),
         new(SystemSettingCategoryName, "沙盒模式", SandboxMode.CreateUI, SandboxMode.UpdateUI, sandboxOnly: true),
     ];
@@ -127,22 +138,33 @@ public sealed class MainWindowCategoryDefinition(string categoryName, IReadOnlyL
 
 /// <summary>
 /// 分馏主面板页面定义。
+/// 支持按进度阶段（矩阵层级）门控显示。
 /// </summary>
 public sealed class MainWindowPageDefinition(
     string categoryName,
     string subpageName,
     Action<MyWindow, RectTransform> createUI,
     Action updateUI,
-    bool sandboxOnly = false) {
+    bool sandboxOnly = false,
+    int minStageIndex = 0) {
     public string CategoryName { get; } = categoryName;
     public string SubpageName { get; } = subpageName;
     public Action<MyWindow, RectTransform> CreateUI { get; } = createUI;
     public Action UpdateUI { get; } = updateUI;
     public bool SandboxOnly { get; } = sandboxOnly;
+    public int MinStageIndex { get; } = minStageIndex;
 
     public bool IsEnabledFor(FEMainPanelType panelType, bool sandboxMode) {
         if (SandboxOnly && !sandboxMode) {
             return false;
+        }
+
+        // 按矩阵阶段门控：当前阶段 < 最低需求阶段时隐藏
+        if (MinStageIndex > 0) {
+            int currentStage = ItemManager.GetCurrentProgressStageIndex();
+            if (currentStage < MinStageIndex) {
+                return false;
+            }
         }
 
         return panelType switch {

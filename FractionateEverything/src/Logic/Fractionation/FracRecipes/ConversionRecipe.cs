@@ -19,25 +19,10 @@ public class ConversionRecipe : BaseRecipe {
     /// 单路锁定时使用的固定目标方案。构造期预计算，运行期只查表。
     /// </summary>
     public readonly struct LockedOutputPlan(OutputInfo sourceOutput, bool isMainOutput, float outputCount) {
-        /// <summary>
-        /// 获取锁定输出对应的原始输出配置。
-        /// </summary>
         public OutputInfo SourceOutput => sourceOutput;
-        /// <summary>
-        /// 获取输出物品 ID。
-        /// </summary>
         public int OutputID => sourceOutput.OutputID;
-        /// <summary>
-        /// 判断该锁定输出是否来自主产物列表。
-        /// </summary>
         public bool IsMainOutput => isMainOutput;
-        /// <summary>
-        /// 获取每次成功输出的基础数量。
-        /// </summary>
         public float OutputCount => outputCount;
-        /// <summary>
-        /// 获取锁定输出相对原始期望产量增加的数量。
-        /// </summary>
         public float ExtraOutputCount => OutputCount - SourceOutput.SuccessRatio * SourceOutput.OutputCount;
     }
 
@@ -141,8 +126,14 @@ public class ConversionRecipe : BaseRecipe {
             ]);
         }
 
-        //化工页面仅保留增产剂这类消耗品链，普通化工材料不能进入转化线。
-        CreateChain([[I增产剂MkI], [I增产剂MkII], [I增产剂MkIII]]);
+        //化工页面
+        if (GenesisBook.Enable) {
+            CreateChain([[IGB聚丙烯], [IGB聚苯硫醚PPS], [IGB聚酰亚胺PI]]);
+        } else if (OrbitalRing.Enable) {
+            CreateChain([[I原油], [IOR重油], [IOR轻油]]);
+        } else {
+            CreateChain([[I增产剂MkI], [I增产剂MkII], [I增产剂MkIII]]);
+        }
 
         //防御页面
         CreateChain([[I原型机], [I精准无人机, I攻击无人机], [I护卫舰], [I驱逐舰], [IMS水滴]]);
@@ -249,9 +240,6 @@ public class ConversionRecipe : BaseRecipe {
     /// <param name="baseSuccessRatio">最大成功率</param>
     /// <param name="outputMain">主输出物品</param>
     /// <param name="outputAppend">附加输出物品</param>
-    /// <summary>
-    /// 执行 ConversionRecipe 对应的分馏域操作。
-    /// </summary>
     public ConversionRecipe(int inputID, float baseSuccessRatio, List<OutputInfo> outputMain,
         List<OutputInfo> outputAppend)
         : base(inputID, baseSuccessRatio, outputMain, outputAppend) {
@@ -259,9 +247,6 @@ public class ConversionRecipe : BaseRecipe {
     }
 
     private readonly Dictionary<int, LockedOutputPlan> lockedOutputPlansByItemId;
-    /// <summary>
-    /// 判断该转化配方是否支持单路锁定输出。
-    /// </summary>
     public bool SupportsLockedOutput => lockedOutputPlansByItemId.Count > 0;
 
     /// <summary>
@@ -269,9 +254,6 @@ public class ConversionRecipe : BaseRecipe {
     /// </summary>
     public static int CurrentLockedOutputId = 0;
 
-    /// <summary>
-    /// 执行单次完整分馏结算并写回主产物、副产物和输入保留结果。
-    /// </summary>
     public override void GetOutputs(ref uint seed, float pointsBonus, float successBoost,
         int fluidInputIncAvg, ref int fluidInputInc, out int inputChange, out List<ProductOutputInfo> outputs) {
         if (ConversionTower.EnableSingleLock
@@ -287,9 +269,6 @@ public class ConversionRecipe : BaseRecipe {
             fluidInputIncAvg, ref fluidInputInc, out inputChange, out outputs);
     }
 
-    /// <summary>
-    /// 执行单次轻量分馏结算，供运行热路径减少分配使用。
-    /// </summary>
     public override FractionationOutcome GetOutputsFast(ref uint seed, float pointsBonus, float successBoost,
         int fluidInputIncAvg, ref int fluidInputInc, out int inputChange, ProductOutputBuffer outputs) {
         if (ConversionTower.EnableSingleLock
@@ -303,9 +282,6 @@ public class ConversionRecipe : BaseRecipe {
             fluidInputIncAvg, ref fluidInputInc, out inputChange, outputs);
     }
 
-    /// <summary>
-    /// 执行批量轻量分馏结算，供运行热路径合并多次处理。
-    /// </summary>
     public override FractionationBatchResult GetOutputsBatchFast(ref uint seed, float pointsBonus, float successBoost,
         int batchCount, int fluidInputIncAvg, ref int fluidInputInc, ProductOutputBuffer outputs) {
         if (ConversionTower.EnableSingleLock
@@ -319,9 +295,6 @@ public class ConversionRecipe : BaseRecipe {
             fluidInputIncAvg, ref fluidInputInc, outputs);
     }
 
-    /// <summary>
-    /// 尝试取得指定物品对应的转化塔锁定输出方案。
-    /// </summary>
     public bool TryGetLockedOutputPlan(int itemId, out LockedOutputPlan lockedPlan) =>
         lockedOutputPlansByItemId.TryGetValue(itemId, out lockedPlan);
 
@@ -443,7 +416,6 @@ public class ConversionRecipe : BaseRecipe {
             SuccessCount = successCount,
             DestroyedCount = destroyedCount,
             PassThroughCount = passThroughCount,
-            PassThroughInc = fluidInputIncAvg * passThroughCount,
         };
         return result;
     }
@@ -516,25 +488,16 @@ public class ConversionRecipe : BaseRecipe {
 
     #region IModCanSave
 
-    /// <summary>
-    /// 从存档读取该分馏域状态。
-    /// </summary>
     public override void Import(BinaryReader r) {
         base.Import(r);
         r.ReadBlocks();
     }
 
-    /// <summary>
-    /// 将该分馏域状态写入存档。
-    /// </summary>
     public override void Export(BinaryWriter w) {
         base.Export(w);
         w.WriteBlocks();
     }
 
-    /// <summary>
-    /// 切换或进入其他存档时重置该分馏域状态。
-    /// </summary>
     public override void IntoOtherSave() {
         base.IntoOtherSave();
     }

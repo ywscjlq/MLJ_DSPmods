@@ -4,6 +4,8 @@ using FE.Logic.Fractionation.FracRecipes;
 using static FE.Logic.DataCenter.DataCenterInventory;
 using static FE.Utils.Utils;
 using static FE.Logic.DataCenter.PlayerInventoryAccess;
+using FE.Logic.Economy;
+using UnityEngine;
 
 namespace FE.Logic.Gacha;
 
@@ -42,8 +44,7 @@ public static partial class GachaService {
 
             GachaManager.RecordDraw(poolId, rarity == GachaRarity.S);
             GachaManager.AddPoolPoints(GachaPool.PoolIdGrowth, 1);
-            int displayItemId = reward.DisplayItemId > 0 ? reward.DisplayItemId : itemId;
-            results.Add(new GachaResult(displayItemId, rarity, focusMatchType, reward.RewardType, reward.RewardItemId,
+            results.Add(new GachaResult(itemId, rarity, focusMatchType, reward.RewardType, reward.RewardItemId,
                 reward.RewardCount, wasHardPity: hardPity));
         }
 
@@ -66,39 +67,9 @@ public static partial class GachaService {
         if (GachaPool.IsRecipePool(poolId)) {
             return ResolveRecipeReward(itemId);
         }
-        if (GachaPool.IsProtoLoopPool(poolId)) {
-            return ResolveProtoLoopReward(itemId);
-        }
 
         AddItemToModData(itemId, 1, 0, false);
         return new GachaRewardResolution(GachaRewardType.ItemGranted, itemId, 1);
-    }
-
-    private static GachaRewardResolution ResolveProtoLoopReward(int itemId) {
-        AddItemToModData(itemId, 1, 0, false);
-        if (!TryGetProtoLoopDrawUnit(itemId, out GachaDrawUnit unit)) {
-            return new GachaRewardResolution(GachaRewardType.ItemGranted, itemId, 1);
-        }
-
-        BaseRecipe recipe = SelectDrawUnitTargetRecipe(unit);
-        if (recipe == null) {
-            return new GachaRewardResolution(GachaRewardType.ItemGranted, itemId, 1);
-        }
-
-        if (IsDrawUnitFullyUnlocked(unit)
-            && GachaManager.TryAddDrawUnitResonance(unit.Key, out int resonanceLevel)) {
-            RecipeGrowthQueries.ClearProcessingCache();
-            InitPools();
-            return new GachaRewardResolution(GachaRewardType.DrawUnitResonance, 0, resonanceLevel, unit.DisplayItemId);
-        }
-
-        bool wasLocked = !RecipeGrowthQueries.IsUnlocked(recipe);
-        RecipeGrowthResult growthResult =
-            RecipeGrowthExecutor.ApplyDrawReward(recipe, RecipeGrowthManager.BuildContext(manual: true));
-        GachaRewardType rewardType = wasLocked
-            ? GachaRewardType.RecipeUnlock
-            : growthResult.StateChanged ? GachaRewardType.RecipeUpgrade : GachaRewardType.RecipeProgress;
-        return new GachaRewardResolution(rewardType, 0, RecipeGrowthQueries.GetLevel(recipe), unit.DisplayItemId);
     }
 
     private static GachaRewardResolution ResolveRecipeReward(int inputId) {
@@ -108,90 +79,41 @@ public static partial class GachaService {
 
         EnsureRecipeRewardIndex();
 
-        if (!recipeRewardIndex.TryGetValue(inputId, out GachaDrawUnit unit)) {
-            AddItemToModData(inputId, 1, 0, false);
-            return new GachaRewardResolution(GachaRewardType.ItemGranted, inputId, 1);
-        }
-
-        BaseRecipe recipe = SelectDrawUnitTargetRecipe(unit);
-        if (recipe == null) {
+        if (!recipeRewardIndex.TryGetValue(inputId, out BaseRecipe recipe)) {
             AddItemToModData(inputId, 1, 0, false);
             return new GachaRewardResolution(GachaRewardType.ItemGranted, inputId, 1);
         }
 
         bool wasLocked = !RecipeGrowthQueries.IsUnlocked(recipe);
-        if (IsDrawUnitFullyUnlocked(unit) && GachaManager.TryAddDrawUnitResonance(unit.Key, out int resonanceLevel)) {
-            RecipeGrowthQueries.ClearProcessingCache();
-            InitPools();
-            return new GachaRewardResolution(GachaRewardType.DrawUnitResonance, 0, resonanceLevel, unit.DisplayItemId);
-        }
-
         RecipeGrowthResult growthResult =
             RecipeGrowthExecutor.ApplyDrawReward(recipe, RecipeGrowthManager.BuildContext(manual: true));
 
         if (growthResult.FragmentReward > 0) {
             int fragmentReward = growthResult.FragmentReward;
             AddItemToModData(IFE残片, fragmentReward, 0, true);
-            return new GachaRewardResolution(GachaRewardType.DuplicateRecipeFragments, IFE残片, fragmentReward,
-                unit.DisplayItemId);
+            return new GachaRewardResolution(GachaRewardType.DuplicateRecipeFragments, IFE残片, fragmentReward);
         }
 
-        GachaRewardType rewardType = wasLocked
-            ? GachaRewardType.RecipeUnlock
-            : growthResult.StateChanged ? GachaRewardType.RecipeUpgrade : GachaRewardType.RecipeProgress;
-        return new GachaRewardResolution(rewardType, 0, RecipeGrowthQueries.GetLevel(recipe), unit.DisplayItemId);
+        return new GachaRewardResolution(wasLocked ? GachaRewardType.RecipeUnlock : GachaRewardType.RecipeUpgrade, 0,
+            RecipeGrowthQueries.GetLevel(recipe));
     }
 
-    private static void EnsureRecipeRewardIndex(bool force = false) {
+    private static void EnsureRecipeRewardIndex() {
         int recipeCount = RecipeManager.AllRecipes.Count;
-        if (!force && recipeRewardIndexRecipeCount == recipeCount) {
-            return;
-        }
-        if (isRebuildingRecipeRewardIndex) {
+        if (recipeRewardIndexRecipeCount == recipeCount) {
             return;
         }
 
-        isRebuildingRecipeRewardIndex = true;
-        try {
-            recipeRewardIndex.Clear();
-            foreach (GachaDrawUnit unit in GetRewardDrawUnits()) {
-                if (!unit.Key.IsValid || unit.DisplayItemId <= 0 || recipeRewardIndex.ContainsKey(unit.DisplayItemId)) {
-                    continue;
-                }
-
-                recipeRewardIndex.Add(unit.DisplayItemId, unit);
-            }
-
-            recipeRewardIndexRecipeCount = recipeCount;
-        } finally {
-            isRebuildingRecipeRewardIndex = false;
-        }
-    }
-
-    private static BaseRecipe SelectDrawUnitTargetRecipe(GachaDrawUnit unit) {
-        BaseRecipe fallback = null;
-        BaseRecipe bestProgressTarget = null;
-        foreach (RecipeKey key in unit.RecipeKeys) {
-            BaseRecipe recipe = RecipeManager.GetRecipe<BaseRecipe>(key.RecipeType, key.InputId);
-            if (recipe == null) {
+        recipeRewardIndex.Clear();
+        foreach (BaseRecipe recipe in RecipeManager.AllRecipes) {
+            if (!IsOpeningLineRecipe(recipe) || recipeRewardIndex.ContainsKey(recipe.InputID)) {
                 continue;
             }
 
-            fallback ??= recipe;
-            if (!RecipeGrowthQueries.IsUnlocked(recipe)) {
-                return recipe;
-            }
-
-            if (!RecipeGrowthQueries.IsMaxed(recipe)
-                && (bestProgressTarget == null
-                    || RecipeGrowthQueries.GetLevel(recipe) < RecipeGrowthQueries.GetLevel(bestProgressTarget)
-                    || RecipeGrowthQueries.GetLevel(recipe) == RecipeGrowthQueries.GetLevel(bestProgressTarget)
-                    && recipe.InputID < bestProgressTarget.InputID)) {
-                bestProgressTarget = recipe;
-            }
+            recipeRewardIndex.Add(recipe.InputID, recipe);
         }
 
-        return bestProgressTarget ?? fallback;
+        recipeRewardIndexRecipeCount = recipeCount;
     }
 
     private static GachaRarity RollRarity(GachaPool pool, float currentSRate, bool forceS) {
@@ -216,4 +138,62 @@ public static partial class GachaService {
 
         return GachaRarity.C;
     }
+
+    /// <summary>
+    /// 选取数据中心中库存最高的可消耗物品作为抽卡资源。
+    /// 排除矩阵、基础矿物、黑雾专属材料。
+    /// </summary>
+    public static int SelectHighestStockCostItem()
+    {
+        const int minItemId = 1000;  // 跳过基础物品
+        int bestItemId = IFE残片;
+        long bestStock = 0;
+
+        if (centerItemCount == null) return bestItemId;
+
+        for (int i = minItemId; i < centerItemCount.Length && i < 12000; i++)
+        {
+            long stock = centerItemCount[i];
+            if (stock <= 100) continue;
+
+            var proto = LDB.items.Select(i);
+            if (proto == null) continue;
+            if (proto.ID == I沙土 || proto.ID == IFE残片) continue;
+            // 排除矩阵类
+            if (proto.Type == EItemType.Matrix) continue;
+            // 排除黑雾专属（高价值保留）
+            if (proto.UnlockKey == -2) continue;
+
+            if (stock > bestStock)
+            {
+                bestStock = stock;
+                bestItemId = i;
+            }
+        }
+
+        return bestItemId;
+    }
+
+    /// <summary>
+    /// 根据物品价值和抽卡次数计算实际消耗数量。
+    /// </summary>
+    public static int CalculateDrawCost(int resourceItemId, int drawCount)
+    {
+        // 基础消耗：1 单位/抽（沿用原版定价逻辑）
+        // 如果资源物品是 IFE残片，保持原价
+        if (resourceItemId == IFE残片 || resourceItemId <= 0)
+            return GetDrawMatrixCost(0, drawCount);
+
+        // 非残片资源：根据价值折算，价值越高所需数量越少
+        float baseValue = 1.0f;
+        try {
+            baseValue = FE.Logic.Economy.MarketValueManager.GetBaseValue(resourceItemId);
+        } catch { baseValue = 1.0f; }
+
+        if (baseValue <= 0f) baseValue = 1f;
+        int baseCost = GetDrawMatrixCost(0, drawCount);
+        int adjustedCost = Mathf.Max(1, (int)(baseCost * 5f / baseValue));
+        return adjustedCost;
+    }
+
 }

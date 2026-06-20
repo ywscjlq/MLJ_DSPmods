@@ -23,26 +23,30 @@ extract and upgrade related recipes and buildings!
 
 万物分馏添加了全新的建筑，它们的效果非常强大！
 
-* 交互塔：将分馏塔原胚培养为不同的分馏塔。除此之外，当交互塔的正面输入并且两侧无连接时，输入的物品会上传至分馏数据中心；某类分馏塔在数据中心达到1000个后，分馏献祭会按秒消耗当前库存的一部分，为对应塔种提供当秒成功率加成。
+* 交互塔：将分馏塔原胚培养为不同的分馏塔。除此之外，当交互塔的正面输入并且两侧无连接时，输入的物品会上传至分馏数据中心。
 * 矿物复制塔：复制各种矿物，包括黑雾特有掉落。需要在分馏数据中心解锁并升级对应配方。
+* 点数聚集塔：将增产点数集中到部分物品上，从而产出携带更多的增产点数的物品。需要在分馏数据中心升级点数聚集效率层次。
+* 量子复制塔：利用分馏精华卓越的可塑性复制各种物品。增产点数可以减少分馏精华的消耗。运行时会自动从分馏数据中心扣除四种分馏精华。需要在分馏数据中心解锁并升级对应配方。
 * 转化塔：将物品转化为与其相关的其他物品。需要在分馏数据中心解锁并升级对应配方。
-* 精馏塔：将矩阵精馏为矩阵精华，并在矩阵精华之间压缩、回流或拆成残片，用于支撑 FE 自身的成长和购买项。需要在分馏数据中心解锁并升级对应配方。
 * 物流交互站：可以与分馏数据中心进行物品交互的行星内物流运输站。
 
 Fractionate Everything has added brand new buildings which are very powerful in their effects!
 
 * Interaction Tower: Cultivates the fractionator proto-germ into a different fractionator. In addition to this, when the
   front of the Interaction Tower is input and there are no connections on either side, the input items will be uploaded
-  to the Fractionation Data Center. Once the data centre holds at least 1000 fractionators of a type, fractionation
-  sacrifice consumes part of the current stock each second to provide a same-second success-rate boost for the matching
-  tower type.
+  to the Fractionation Data Center.
 * Mineral Duplication Tower: Duplicates various minerals, including Black Mist-specific drops. There is a certain
   probability of getting a replication essence. You need to unlock and upgrade the corresponding recipe in the
   Fractionation Data Center.
+* Point Aggregation Tower: Concentrate production increase points on some items, thus producing items with more
+  production increase points. Requires upgrading the Point Aggregation Efficiency Level in the Fractionation Data
+  Center.
+* Quantum Replication Tower: Utilizes the superior malleability of Fractionation Essence to replicate various items.
+  Increased production points reduce the consumption of Fractionation Essence. Four types of Fractionated Essence are
+  automatically deducted from the Fractionation Data Center when running. You need to unlock and upgrade the
+  corresponding recipe in the Fractionation Data Center.
 * Conversion Tower: Convert items into other items related to them. There is a certain probability of obtaining
   Transformation Essence. You need to unlock and upgrade the corresponding recipe in the Fractionation Data Center.
-* Rectification Tower: Rectifies matrices into matrix essences, then compresses, refluxes, or splits essences into fragments for FE growth and purchases. You need to unlock and
-  upgrade the corresponding recipe in the Fractionation Data Center.
 * Logistics Interaction Station: An intra-planetary logistics station that can interact with the Fractionation Data
   Center.
 
@@ -50,25 +54,26 @@ Fractionate Everything has added brand new buildings which are very powerful in 
 
 抽奖是很重要的一环。快来试试你的手气吧！
 
-* 主抽取：消耗当前阶段矩阵，按抽取偏好获得路线抽取单位、分馏塔原胚、定向原胚和补差资源。抽取单位可能是一条配方、一个资源组、一条转化链、一个塔种或一个精馏家族。
-* 抽取偏好：可以在平衡、路线优先、原胚优先之间切换，用很少的操作控制当前发展方向。
-* 成长规划：使用成长积分、残片和矩阵精华进行确定性补差，避免手动重复操作无限拖延。
-* 流派聚焦：不是独立奖池，而是对主抽取偏好和成长规划命中权重进行方向修正。
+* 配方奖池：可以抽取各种分馏配方。
+* 原胚奖池：可以抽取各种分馏塔原胚。
+* 材料奖池：可以抽取各种已解锁的材料。
+* 建筑奖池：可以抽取各种已解锁的建筑。
 
 Raffles are an important part of the process. Come and try your luck!
 
-* Main Draw: Spend the current-stage Matrix to obtain route draw units, fractionator protos, directional protos, and catch-up
-  resources according to your draw preference.
-* Draw Preference: Switch between balanced, route-first, and proto-first to steer progression with minimal operation.
-* Growth Planning: Spend growth points, fragments, and matrix essences on deterministic catch-up.
-* Focus Control: Not a standalone pool. It biases Main Draw preference and Growth Planning hits toward the selected route.
+* Recipe Prize Pool: You can draw all kinds of Fractionation Recipes, and if you are lucky, you can also get the
+  Fractionation Recipe Universal Core.
+* Original embryo prize pool: you can extract a variety of fractionator embryo, good luck can also get the fractionator
+  increase chip.
+* Material Pool: You can extract various unlocked materials.
+* Building Pool: You can draw various unlocked buildings.
 
 ### 配方升级与突破、建筑升级与强化 Recipe upgrades and breakthroughs, building upgrades and enhancements
 
 无论是配方还是建筑，都需要不断升级，才能达到最强力的状态！
 
 * 配方升级：使用指定配方分馏即可持续获得经验，经验达标后可自动升级！
-* 配方长期成长：重复获得已解锁抽取单位会提升回响或补充成长进度；满级后多余收益会转入残片等长期资源。回响提供小幅附加效果，不是基础自动化门票。
+* 配方突破：配方品质有白、绿、蓝、紫、红、金，达到一定等级，收集足够数目的回响，即可突破到新的品质！
 * 建筑升级：建筑有很多实用的升级项，例如流动输出堆叠、产物输出堆叠，可以摆脱集装的烦恼！
 * 建筑强化：建筑完全升级后，即可逐步强化至+20，加快速率，提升产能！
 
@@ -76,8 +81,8 @@ Both recipes and buildings need to be constantly upgraded to reach their most po
 
 * Recipe upgrading: using the specified recipe fractionation can be continuously gained experience, experience can be
   automatically upgraded after reaching the standard!
-* Long-term recipe growth: duplicate unlocked recipes add growth progress; overflow from maxed recipes becomes long-term
-  resources such as fragments.
+* Recipe Breakthrough: Recipe qualities are white, green, blue, purple, red, and gold, reaching a certain level and
+  collecting a sufficient number of echoes can break through to a new quality!
 * Building Upgrade: There are many practical upgrades for buildings, such as flow output stacking and product output
   stacking, which can get rid of the trouble of assembling!
 * Building Enhancement: Once a building is fully upgraded, it can be gradually enhanced to +20 to speed up the rate and

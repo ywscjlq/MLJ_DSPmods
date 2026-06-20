@@ -1,15 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-
+<!-- 复制此文件为 DefaultPath.props 并修改为你的本地路径 -->
 <Project>
     <PropertyGroup Label="DefaultPath">
-        <ProfileDir>C:\Users\MLJ\AppData\Roaming\r2modmanPlus-local\DysonSphereProgram\profiles\Default</ProfileDir>
+        <ProfileDir>C:\Users\你的用户名\AppData\Roaming\r2modmanPlus-local\DysonSphereProgram\profiles\Default</ProfileDir>
         <DSPGameDir>D:\Steam\steamapps\common\Dyson Sphere Program</DSPGameDir>
-        <NugetGameLibDir>C:\Users\MLJ\.nuget\packages\dysonsphereprogram.gamelibs</NugetGameLibDir>
-        <ModSourcesRootDir>D:\project\dsp</ModSourcesRootDir>
-        <MoreMegaStructureSourceDir>D:\project\dsp\DSPmod_MoreMegaStructures</MoreMegaStructureSourceDir>
-        <TheyComeFromVoidSourceDir>D:\project\dsp\DSP_Battle</TheyComeFromVoidSourceDir>
-        <GenesisBookSourceDir>D:\project\dsp\ProjectGenesis</GenesisBookSourceDir>
-        <OrbitalRingSourceDir>D:\project\dsp\OrbitalRing-MOD</OrbitalRingSourceDir>
-        <FractionateEverythingSourceDir>D:\project\dsp\MLJ_DSPmods\FractionateEverything</FractionateEverythingSourceDir>
+        <NugetRoot>C:\Users\你的用户名\.nuget\packages</NugetRoot>
+        <!-- NugetGameLibDir 不含版本号，PathConfig.cs 会自动扫描最新版本 -->
+        <NugetGameLibDir>$(NugetRoot)\dysonsphereprogram.gamelibs</NugetGameLibDir>
+        <!-- 如需修改版本号，更新以下变量即可 -->
+        <GameLibsVersion>0.10.34.28529-r.0</GameLibsVersion>
+        <UnityVersion>2022.3.53</UnityVersion>
+        <NetFxVersion>1.0.3</NetFxVersion>
+        <!-- dsp-calc 工具路径（可选，仅数据导出功能需要） -->
+        <DspCalcDir></DspCalcDir>
+        <!-- FE资源目录（可选，仅Unity资源打包需要） -->
+        <FEAssetsDir></FEAssetsDir>
     </PropertyGroup>
 </Project>

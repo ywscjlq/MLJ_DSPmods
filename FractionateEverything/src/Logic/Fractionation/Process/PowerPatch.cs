@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -8,13 +8,7 @@ using static FE.Utils.Utils;
 
 namespace FE.Logic.Fractionation.Process;
 
-/// <summary>
-/// 分馏塔耗电计算的运行时补丁。
-/// </summary>
 public static partial class ProcessManager {[HarmonyTranspiler]
-    /// <summary>
-    /// 将原版分馏器能耗更新调用替换为 FE 分馏塔能耗适配入口。
-    /// </summary>
     [HarmonyPatch(typeof(FactorySystem), nameof(FactorySystem.GameTick))]
     [HarmonyPatch(typeof(GameLogic), nameof(GameLogic._fractionator_parallel))]
     public static IEnumerable<CodeInstruction> FactorySystem_SetPCState_Transpiler(
@@ -44,14 +38,15 @@ public static partial class ProcessManager {[HarmonyTranspiler]
                 if (original.DeclaringType == typeof(FactorySystem)) {
                     m.InsertAndAdvance(new CodeInstruction(OpCodes.Ldarg_0));// FactorySystem
                     m.InsertAndAdvance(new CodeInstruction(OpCodes.Ldfld, factoryField));// PlanetFactory
-                    m.InsertAndAdvance(new CodeInstruction(OpCodes.Ldfld, entityPoolField));// EntityData[]
+                    m.InsertAndAdvance(new CodeInstruction(OpCodes.Dup));// PlanetFactory, PlanetFactory
+                    m.InsertAndAdvance(new CodeInstruction(OpCodes.Ldfld, entityPoolField));// PlanetFactory, EntityData[]
                 } else {
-                    // GameLogic._fractionator_parallel: planetFactory 是局部变量，通过方法体局部变量列表定位
                     var locals = original.GetMethodBody()!.LocalVariables;
                     var planetFactoryLocal = locals.First(v => v.LocalType == typeof(PlanetFactory));
                     m.InsertAndAdvance(new CodeInstruction(OpCodes.Ldloc_S,
-                        (byte)planetFactoryLocal.LocalIndex));// PlanetFactory (local var)
-                    m.InsertAndAdvance(new CodeInstruction(OpCodes.Ldfld, entityPoolField));// EntityData[]
+                        (byte)planetFactoryLocal.LocalIndex));// PlanetFactory
+                    m.InsertAndAdvance(new CodeInstruction(OpCodes.Dup));// PlanetFactory, PlanetFactory
+                    m.InsertAndAdvance(new CodeInstruction(OpCodes.Ldfld, entityPoolField));// PlanetFactory, EntityData[]
                 }
                 m.SetInstruction(new CodeInstruction(OpCodes.Call, replacementSetPCStateMethod));
             });
@@ -59,16 +54,13 @@ public static partial class ProcessManager {[HarmonyTranspiler]
         return matcher.InstructionEnumeration();
     }
 
-    /// <summary>
-    /// 使用实体池为分馏塔设置电力消费者状态。
-    /// </summary>
     public static void SetPCStateWithEntityPool(ref FractionatorComponent fractionator, PowerConsumerComponent[] pcPool,
-        EntityData[] entityPool) {
+        EntityData[] entityPool, PlanetFactory factory) {
         long perfStart = GetFractionatorPerfTimestamp();
         int buildingID = entityPool[fractionator.entityId].protoId;
-        if (!FractionatorTowerCatalog.IsActiveFractionator(buildingID)) {
+        if (buildingID < IFE交互塔 || buildingID > IFE精馏塔) {
             try {
-                fractionator.SetPCState(pcPool);// 原版分馏塔保持原逻辑
+                fractionator.SetPCState(pcPool);
                 return;
             }
             finally {
@@ -77,18 +69,16 @@ public static partial class ProcessManager {[HarmonyTranspiler]
             }
         }
         try {
-            fractionator.SetPCState(pcPool, buildingID);
+            fractionator.SetPCState(pcPool, buildingID, factory.planetId);
         }
         finally {
-            RecordFractionatorPerf(FractionatorPerfSetPcFe, buildingID, GetFractionatorPerfElapsed(perfStart));
+            RecordFractionatorPerf(FractionatorPerfSetPcFe, buildingID,
+                GetFractionatorPerfElapsed(perfStart));
         }
     }
 
-    /// <summary>
-    /// 按 FE 分馏塔能耗规则设置电力消费者状态。
-    /// </summary>
     public static void SetPCState(this ref FractionatorComponent fractionator,
-        PowerConsumerComponent[] pcPool, int buildingID) {
+        PowerConsumerComponent[] pcPool, int buildingID, int planetId = -1) {
         double num1 = fractionator.fluidInputCargoCount > 0.0001
             ? fractionator.fluidInputCount / (double)fractionator.fluidInputCargoCount
             : 4.0;
@@ -98,10 +88,25 @@ public static partial class ProcessManager {[HarmonyTranspiler]
         num2 = num2 * num1 - MaxBeltSpeed;
         if (num2 < 0.0)
             num2 = 0.0;
-        double powerRatio = Cargo.powerTableRatio[fractionator.incLevel] * GetFractionatorEnergyRatio(buildingID);
+        double powerRatio = buildingID switch {
+            IFE点数聚集塔 => 1.0,
+            _ => Cargo.powerTableRatio[fractionator.incLevel] * GetFractionatorEnergyRatio(buildingID)
+        };
         ref PowerConsumerComponent pc = ref pcPool[fractionator.pcId];
-        pc.workEnergyPerTick = GetFractionatorWorkEnergyPerTick(buildingID);
-        pc.idleEnergyPerTick = GetFractionatorIdleEnergyPerTick(buildingID);
+        long baseWork = GetFractionatorWorkEnergyPerTick(buildingID);
+        long baseIdle = GetFractionatorIdleEnergyPerTick(buildingID);
+        // 词缀节能：从缓存读取并应用到功率
+        if (planetId > 0) {
+            float reduction = FE.Logic.Fractionation.Affix.FracAffixManager.GetPowerReduction(planetId, fractionator.id);
+            if (reduction > 0.001f) {
+                float multiplier = 1f - reduction;
+                if (multiplier < 0.1f) multiplier = 0.1f; // 最低10%功率
+                baseWork = (long)(baseWork * multiplier);
+                baseIdle = (long)(baseIdle * multiplier);
+            }
+        }
+        pc.workEnergyPerTick = baseWork;
+        pc.idleEnergyPerTick = baseIdle;
         int permillage = (int)((num2 * 50.0 * 30.0 / MaxBeltSpeed + 1000.0) * powerRatio + 0.5);
         pc.SetRequiredEnergy(fractionator.isWorking, permillage);
     }
@@ -110,6 +115,7 @@ public static partial class ProcessManager {[HarmonyTranspiler]
         return buildingID switch {
             IFE交互塔 => InteractionTower.workEnergyPerTick,
             IFE矿物复制塔 => MineralReplicationTower.workEnergyPerTick,
+            IFE点数聚集塔 => PointAggregateTower.workEnergyPerTick,
             IFE转化塔 => ConversionTower.workEnergyPerTick,
             IFE精馏塔 => RectificationTower.workEnergyPerTick,
             _ => 0
@@ -120,6 +126,7 @@ public static partial class ProcessManager {[HarmonyTranspiler]
         return buildingID switch {
             IFE交互塔 => InteractionTower.idleEnergyPerTick,
             IFE矿物复制塔 => MineralReplicationTower.idleEnergyPerTick,
+            IFE点数聚集塔 => PointAggregateTower.idleEnergyPerTick,
             IFE转化塔 => ConversionTower.idleEnergyPerTick,
             IFE精馏塔 => RectificationTower.idleEnergyPerTick,
             _ => 0

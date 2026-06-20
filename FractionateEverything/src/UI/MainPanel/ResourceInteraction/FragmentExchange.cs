@@ -29,15 +29,12 @@ public static class FragmentExchange {
     private static UIButton btnBuy1;
     private static UIButton btnBuy10;
     private static UIButton btnBuy100;
+    private static UIButton btnBuyMax;
 
     private static int selectedItemId = I电磁矩阵;
 
     public static void AddTranslations() {
-        Register("残片兑换", "Stable Exchange", "稳定兑换");
-        Register("残片市场", "Rescue Exchange", "救急兑换");
-        Register("买1", "Buy 1");
-        Register("买10", "Buy 10");
-        Register("买100", "Buy 100");
+        Register("残片兑换", "Fragment Exchange");
         Register("兑换价格", "Quote");
         Register("当前持有", "Balance");
         Register("目标物品", "Target Item", "目标物品");
@@ -96,7 +93,7 @@ public static class FragmentExchange {
                                         pos: (0, 0), objectName: "fragment-exchange-action-title"),
                                     Grid(
                                         pos: (1, 0),
-                                        cols: [1, 1, 1],
+                                        cols: [1, 1, 1, 1],
                                         columnGap: PageLayout.InnerGap,
                                         children: [
                                             ButtonNode("买1", onClick: () => ExchangeItems(1),
@@ -108,6 +105,13 @@ public static class FragmentExchange {
                                             ButtonNode("买100", onClick: () => ExchangeItems(100),
                                                 onBuilt: btn => btnBuy100 = btn,
                                                 pos: (0, 2), objectName: "fragment-exchange-buy-100"),
+                                            ButtonNode("买最大", onClick: () => {
+                                                var q = FragmentExchangeManager.GetQuote(selectedItemId);
+                                                if (q.FragmentCost > 0)
+                                                    ExchangeItems((int)(GetItemTotalCount(IFE残片) / q.FragmentCost));
+                                            },
+                                                onBuilt: btn => btnBuyMax = btn,
+                                                pos: (0, 3), objectName: "fragment-exchange-buy-max"),
                                         ]),
                                 ]),
                         ]),
@@ -131,14 +135,12 @@ public static class FragmentExchange {
         }
 
         if (!FragmentExchangeManager.CanExchangeItem(selectedItemId)) {
-            selectedItemId = GetDefaultExchangeItemId();
+            selectedItemId = I电磁矩阵;
         }
         FragmentExchangeManager.FragmentQuote quote = FragmentExchangeManager.GetQuote(selectedItemId);
         ItemProto item = LDB.items.Select(selectedItemId);
         header.Title.text = "残片兑换".Translate().WithColor(Orange);
-        header.Summary.text = item == null
-            ? string.Empty
-            : $"{"残片兑换".Translate()} / {"目标物品".Translate()}：{item.name}".WithColor(White);
+        header.Summary.text = item == null ? string.Empty : $"{"目标物品".Translate()}：{item.name}".WithColor(White);
         txtInfoTitle.text = "目标物品".Translate().WithColor(Orange);
         txtActionTitle.text = "快速兑换".Translate().WithColor(Orange);
         txtQuoteTitle.text = "兑换摘要".Translate().WithColor(Orange);
@@ -156,6 +158,7 @@ public static class FragmentExchange {
         btnBuy1.button.interactable = GetItemTotalCount(IFE残片) >= quote.FragmentCost;
         btnBuy10.button.interactable = GetItemTotalCount(IFE残片) >= (long)quote.FragmentCost * 10;
         btnBuy100.button.interactable = GetItemTotalCount(IFE残片) >= (long)quote.FragmentCost * 100;
+        if (btnBuyMax != null) btnBuyMax.button.interactable = quote.FragmentCost > 0 && GetItemTotalCount(IFE残片) >= quote.FragmentCost;
     }
 
     private static void OpenItemPicker(float y) {
@@ -172,14 +175,5 @@ public static class FragmentExchange {
         if (FragmentExchangeManager.TryExchange(selectedItemId, count)) {
             UpdateUI();
         }
-    }
-
-    private static int GetDefaultExchangeItemId() {
-        foreach (int itemId in FragmentExchangeManager.GetExchangeableItems()) {
-            if (FragmentExchangeManager.CanExchangeItem(itemId)) {
-                return itemId;
-            }
-        }
-        return 0;
     }
 }

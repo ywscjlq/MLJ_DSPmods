@@ -1,6 +1,6 @@
+using FE.Logic.DarkFog;
 using System;
 using System.Collections.Generic;
-using FE.Logic.Fractionation.Fractionators;
 using FE.Logic.Fractionation.FracRecipes;
 using static FE.Utils.Utils;
 
@@ -11,7 +11,6 @@ namespace FE.Logic.Fractionation.Growth;
 /// </summary>
 public static class RecipeGrowthRules {
     private static readonly int[] BuildingTrainThresholds = [12, 20, 34, 56, 90];
-    private static readonly int[] ProductionThresholds = [16, 28, 48, 80, 132];
     private static readonly int[] DarkFogThresholds = [12, 20, 34, 56, 90];
     private static readonly int[] RectificationThresholds = [14, 24, 42, 72, 120];
 
@@ -21,18 +20,17 @@ public static class RecipeGrowthRules {
         RecipeFamily.BuildingTrainReverse, RecipeGrowthMode.ProcessExp, 5, 0, 1, 1, false, true, false);
     private static readonly RecipeGrowthRule MineralCopyDarkFogRule = new(
         RecipeFamily.MineralCopyDarkFog, RecipeGrowthMode.ProcessExp, 5, 0, 0, 1, false, true, false);
-    private static readonly RecipeGrowthRule ConversionDarkFogChainRule = new(
-        RecipeFamily.ConversionDarkFogChain, RecipeGrowthMode.ProcessExp, 5, 0, 0, 1, false, true, false);
+    private static readonly RecipeGrowthRule ConversionMaterialDarkFogRule = new(
+        RecipeFamily.ConversionMaterialDarkFog, RecipeGrowthMode.ProcessExp, 5, 0, 0, 1, false, true, false);
     private static readonly RecipeGrowthRule ConversionBuildingRule = new(
         RecipeFamily.ConversionBuilding, RecipeGrowthMode.FixedMax, 5, 0, 0, 5, true, false, false);
+    private static readonly RecipeGrowthRule PointAggregateRule = new(
+        RecipeFamily.PointAggregate, RecipeGrowthMode.FixedMax, 5, 5, 5, 5, true, false, false);
     private static readonly RecipeGrowthRule RectificationRule = new(
-        RecipeFamily.Rectification, RecipeGrowthMode.ProcessExpWithPity, 5, 0, 1, 1, false, false, true);
+        RecipeFamily.Rectification, RecipeGrowthMode.ProcessExpWithPity, 5, 0, 1, 0, false, false, true);
     private static readonly Dictionary<BaseRecipe, RecipeFamily> FamilyCache = [];
     private static readonly Dictionary<BaseRecipe, RecipeGrowthRule> RuleCache = [];
 
-    /// <summary>
-    /// 读取配方所属的成长家族。
-    /// </summary>
     public static RecipeFamily GetFamily(BaseRecipe recipe) {
         if (FamilyCache.TryGetValue(recipe, out RecipeFamily family)) {
             return family;
@@ -46,8 +44,9 @@ public static class RecipeGrowthRules {
                 ? RecipeFamily.MineralCopyDarkFog
                 : RecipeFamily.MineralCopyNormal,
             ConversionRecipe => IsBuildingItem(recipe.InputID) ? RecipeFamily.ConversionBuilding :
-                IsDarkFogItem(recipe.InputID) ? RecipeFamily.ConversionDarkFogChain :
-                RecipeFamily.ConversionItemChain,
+                IsDarkFogItem(recipe.InputID) ? RecipeFamily.ConversionMaterialDarkFog :
+                RecipeFamily.ConversionMaterialNormal,
+            PointAggregateRecipe => RecipeFamily.PointAggregate,
             RectificationRecipe => RecipeFamily.Rectification,
             _ => RecipeFamily.Unknown,
         };
@@ -55,9 +54,6 @@ public static class RecipeGrowthRules {
         return family;
     }
 
-    /// <summary>
-    /// 读取配方使用的成长规则。
-    /// </summary>
     public static RecipeGrowthRule GetRule(BaseRecipe recipe) {
         if (RuleCache.TryGetValue(recipe, out RecipeGrowthRule rule)) {
             return rule;
@@ -68,14 +64,15 @@ public static class RecipeGrowthRules {
             RecipeFamily.BuildingTrainForward => BuildingTrainForwardRule,
             RecipeFamily.BuildingTrainReverse => BuildingTrainReverseRule,
             RecipeFamily.MineralCopyNormal => new RecipeGrowthRule(
-                family, RecipeGrowthMode.ProcessExp, 5, 0, GetStageBaselineLevel(recipe.MatrixID),
-                GetDrawUnlockLevel(recipe.MatrixID), false, true, false),
+                family, RecipeGrowthMode.DrawDuplicate, 5, 0, GetStageBaselineLevel(recipe.MatrixID),
+                GetDrawUnlockLevel(recipe.MatrixID), false, false, false),
             RecipeFamily.MineralCopyDarkFog => MineralCopyDarkFogRule,
-            RecipeFamily.ConversionItemChain => new RecipeGrowthRule(
-                family, RecipeGrowthMode.ProcessExp, 5, 0, 0, GetDrawUnlockLevel(recipe.MatrixID),
-                false, true, false),
-            RecipeFamily.ConversionDarkFogChain => ConversionDarkFogChainRule,
+            RecipeFamily.ConversionMaterialNormal => new RecipeGrowthRule(
+                family, RecipeGrowthMode.DrawDuplicate, 5, 0, 0, GetDrawUnlockLevel(recipe.MatrixID),
+                false, false, false),
+            RecipeFamily.ConversionMaterialDarkFog => ConversionMaterialDarkFogRule,
             RecipeFamily.ConversionBuilding => ConversionBuildingRule,
+            RecipeFamily.PointAggregate => PointAggregateRule,
             RecipeFamily.Rectification => RectificationRule,
             _ => new RecipeGrowthRule(RecipeFamily.Unknown, RecipeGrowthMode.None, 5, 0, 0, 1, false, false, false),
         };
@@ -83,9 +80,6 @@ public static class RecipeGrowthRules {
         return rule;
     }
 
-    /// <summary>
-    /// 读取矩阵阶段对应的基础配方等级。
-    /// </summary>
     public static int GetStageBaselineLevel(int matrixId) {
         return matrixId switch {
             I电磁矩阵 => 3,
@@ -95,17 +89,11 @@ public static class RecipeGrowthRules {
         };
     }
 
-    /// <summary>
-    /// 读取矩阵阶段对应的抽取解锁等级。
-    /// </summary>
     public static int GetDrawUnlockLevel(int matrixId) {
         int baseline = GetStageBaselineLevel(matrixId);
         return baseline > 0 ? baseline : 1;
     }
 
-    /// <summary>
-    /// 将配方等级限制在成长规则允许的范围内。
-    /// </summary>
     public static int ClampLevel(RecipeGrowthRule rule, int level) {
         if (level < 0) {
             level = 0;
@@ -113,11 +101,11 @@ public static class RecipeGrowthRules {
         return level > rule.MaxLevel ? rule.MaxLevel : level;
     }
 
-    /// <summary>
-    /// 将旧版等级转换为当前存储等级。
-    /// </summary>
     public static int ConvertLegacyLevelToStored(BaseRecipe recipe, int legacyLevel) {
         RecipeGrowthRule rule = GetRule(recipe);
+        if (rule.Family == RecipeFamily.PointAggregate) {
+            return rule.MaxLevel;
+        }
         if (legacyLevel < 0) {
             return 0;
         }
@@ -127,11 +115,11 @@ public static class RecipeGrowthRules {
         return ClampLevel(rule, storedLevel);
     }
 
-    /// <summary>
-    /// 读取面向旧版显示和兼容逻辑的有效等级。
-    /// </summary>
     public static int GetEffectiveLegacyLevel(BaseRecipe recipe, int storedLevel) {
         RecipeGrowthRule rule = GetRule(recipe);
+        if (rule.Family == RecipeFamily.PointAggregate) {
+            return 10;
+        }
         if (storedLevel <= 0) {
             return 0;
         }
@@ -144,9 +132,6 @@ public static class RecipeGrowthRules {
         };
     }
 
-    /// <summary>
-    /// 计算当前等级升到下一级所需成长经验。
-    /// </summary>
     public static int GetUpgradeThreshold(RecipeGrowthRule rule, int currentLevel) {
         if (currentLevel < 0 || currentLevel >= rule.MaxLevel) {
             return int.MaxValue;
@@ -154,9 +139,7 @@ public static class RecipeGrowthRules {
         return rule.Family switch {
             RecipeFamily.BuildingTrainForward or RecipeFamily.BuildingTrainReverse => BuildingTrainThresholds[
                 currentLevel],
-            RecipeFamily.MineralCopyNormal or RecipeFamily.ConversionItemChain => ProductionThresholds[
-                currentLevel],
-            RecipeFamily.MineralCopyDarkFog or RecipeFamily.ConversionDarkFogChain => DarkFogThresholds
+            RecipeFamily.MineralCopyDarkFog or RecipeFamily.ConversionMaterialDarkFog => DarkFogThresholds
                 [currentLevel],
             RecipeFamily.Rectification => RectificationThresholds[currentLevel],
             _ => int.MaxValue,
@@ -164,7 +147,7 @@ public static class RecipeGrowthRules {
     }
 
     private static bool IsEmbryoInput(int inputId) {
-        return FractionatorTowerCatalog.IsActiveFractionatorProtoOrDirectional(inputId);
+        return inputId >= IFE交互塔原胚 && inputId <= IFE精馏塔原胚 || inputId == IFE分馏塔定向原胚;
     }
 
     private static bool IsBuildingItem(int inputId) {
@@ -176,4 +159,49 @@ public static class RecipeGrowthRules {
         ItemProto item = LDB.items.Select(inputId);
         return inputId == I黑雾矩阵 || item != null && item.Type == EItemType.DarkFog;
     }
+
+    /// <summary>
+    /// 根据当前黑雾阶段返回额外产物（黑雾联动）。
+    /// 由分馏塔运行时调用。
+    /// </summary>
+    public static (int itemId, int count)[] GetDarkFogBonusOutputs(BaseRecipe recipe, RecipeGrowthContext context)
+    {
+        if (context.DarkFogStage < EDarkFogCombatStage.GroundSuppression)
+            return [];
+
+        EDarkFogCombatStage stage = context.DarkFogStage;
+        var items = new System.Collections.Generic.List<(int, int)>();
+
+        switch (recipe.RecipeType)
+        {
+            case ERecipe.MineralCopy:
+                if (stage >= EDarkFogCombatStage.GroundSuppression)
+                    items.Add((I能量碎片, 0)); // 标记，实际数量由调用方计算
+                break;
+
+            case ERecipe.Conversion:
+                if (stage >= EDarkFogCombatStage.StellarHunt)
+                    items.Add((I负熵奇点, 0));
+                break;
+
+            case ERecipe.Rectification:
+                // 黑雾精馏科技解锁后，精馏塔获得黑雾专属抽成
+                if (DarkFogTechTree.IsResearched(EDarkFogTechId.FogRefinement))
+                    items.Add((I核心素, 0));
+                break;
+        }
+
+        return items.ToArray();
+    }
+
+    /// <summary>
+    /// 计算黑雾分馏效率加成。
+    /// </summary>
+    public static float GetDarkFogFractionationMultiplier(BaseRecipe recipe)
+    {
+        if (!IsDarkFogItem(recipe.InputID))
+            return 1.0f;
+        return DarkFogTechTree.GetDarkFogFractionationMultiplier();
+    }
+
 }

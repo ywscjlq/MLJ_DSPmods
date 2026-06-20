@@ -6,7 +6,6 @@ using BepInEx.Configuration;
 using FE.Logic.Fractionation.Fractionators;
 using FE.Logic.DarkFog;
 using FE.Logic.Fractionation.Growth;
-using FE.Logic.Gacha;
 using FE.UI.Controls;
 using FE.UI.Foundation.Window;
 using FE.UI.Layout;
@@ -60,6 +59,16 @@ public static class Achievements {
         public readonly float EnergyReductionBonus = energyReductionBonus;
         public readonly float LogisticsBonus = logisticsBonus;
         public readonly float PowerStageBonus = powerStageBonus;
+    }
+
+    /// <summary>
+    /// 成就奖励定义。
+    /// </summary>
+    private readonly struct AchievementRewardDefinition(
+        string rewardKey,
+        bool unlockRecurringAutoClaim = false) {
+        public readonly string RewardKey = rewardKey;
+        public readonly bool UnlockRecurringAutoClaim = unlockRecurringAutoClaim;
     }
 
     /// <summary>
@@ -144,48 +153,9 @@ public static class Achievements {
         "成就-精馏开路",
         "成就-万物归一",
     ];
-    private static readonly string[] recurringTaskAchievementNameOrder = [
-        "分馏星河",
-        "分馏星海",
-        "分馏宇宙",
-        "带速成型",
-        "满带洪流",
-        "星河带速",
-        "成就-开线先锋",
-        "开线统筹",
-        "开线传说",
-        "配方启蒙",
-        "配方初识",
-        "成就-配方入门",
-        "配方进修",
-        "配方拓展",
-        "成就-配方学者",
-        "配方总览",
-        "成就-配方专家",
-        "配方馆长",
-        "成就-万物百科",
-        "工艺起步",
-        "工艺进阶",
-        "工艺磨合",
-        "工艺稳态",
-        "成就-工艺优化",
-        "工艺跃迁",
-        "工艺巅峰",
-        "成就-工艺大师",
-        "任务推进",
-        "成就-任务自动化",
-        "任务永动",
-        "黑雾信标",
-        "黑雾压制",
-        "蜂巢猎场",
-        "奇点收束",
-        "基础闭环",
-        "全域工艺",
-        "成就-万物归一",
-        "常规毕业",
-        "速通毕业",
-    ];
     private static readonly Dictionary<string, int> achievementIndexByName = BuildAchievementIndexByName();
+    private static readonly Dictionary<string, AchievementRewardDefinition> rewardDefinitionsByKey =
+        BuildRewardDefinitionsByKey();
     private static bool[] unlocked = new bool[achievements.Length];
     private static bool[] claimed = new bool[achievements.Length];
     private static bool bonusSummaryDirty = true;
@@ -241,12 +211,25 @@ public static class Achievements {
         return map;
     }
 
+    private static Dictionary<string, AchievementRewardDefinition> BuildRewardDefinitionsByKey() {
+        AchievementRewardDefinition[] definitions = [
+            new("成就奖励-循环任务自动领取", unlockRecurringAutoClaim: true),
+        ];
+
+        var map = new Dictionary<string, AchievementRewardDefinition>(definitions.Length);
+        foreach (AchievementRewardDefinition definition in definitions) {
+            map[definition.RewardKey] = definition;
+        }
+        return map;
+    }
+
     private static AchievementInfo[] BuildAchievements() {
         var list = new List<AchievementInfo>(96);
         AddProductionAchievements(list);
         AddOpeningAchievements(list);
         AddRecipeAchievements(list);
         AddGrowthAchievements(list);
+        AddRecurringAchievements(list);
         AddDarkFogAchievements(list);
         AddChallengeAchievements(list);
         return [.. list];
@@ -256,9 +239,9 @@ public static class Achievements {
         var totalDefs =
             new (string Name, long Target, string RewardKey, ETier Tier, float SuccessBonus, float DestroyBonus, float
                 DoubleBonus)[] {
-                    ("分馏星河", 100_000_000L, "成就奖励-源点2", ETier.Gold, 0.01f, 0.003f, 0.003f),
-                    ("分馏星海", 1_000_000_000L, "成就奖励-源点3", ETier.Platinum, 0.02f, 0.006f, 0.008f),
-                    ("分馏宇宙", 10_000_000_000L, "成就奖励-源点5", ETier.Platinum, 0.03f, 0.01f, 0.02f),
+                    ("分馏星河", 100_000_000L, "成就奖励-残片1000", ETier.Gold, 0.01f, 0.003f, 0.003f),
+                    ("分馏星海", 1_000_000_000L, "成就奖励-残片2000", ETier.Platinum, 0.02f, 0.006f, 0.008f),
+                    ("分馏宇宙", 10_000_000_000L, "成就奖励-残片2000", ETier.Platinum, 0.03f, 0.01f, 0.02f),
                 };
 
         foreach ((string name, long target, string rewardKey, ETier tier, float successBonus, float destroyBonus,
@@ -280,9 +263,9 @@ public static class Achievements {
         var rateDefs =
             new (string Name, long Target, string RewardKey, ETier Tier, float SuccessBonus, float DestroyBonus, float
                 DoubleBonus)[] {
-                    ("带速成型", 100_000L, "成就奖励-源点1", ETier.Gold, 0.006f, 0.002f, 0.002f),
-                    ("满带洪流", 1_000_000L, "成就奖励-源点2", ETier.Platinum, 0.012f, 0.004f, 0.006f),
-                    ("星河带速", 10_000_000L, "成就奖励-源点3", ETier.Platinum, 0.02f, 0.008f, 0.012f),
+                    ("带速成型", 100_000L, "成就奖励-残片1000", ETier.Gold, 0.006f, 0.002f, 0.002f),
+                    ("满带洪流", 1_000_000L, "成就奖励-残片2000", ETier.Platinum, 0.012f, 0.004f, 0.006f),
+                    ("星河带速", 10_000_000L, "成就奖励-残片2000", ETier.Platinum, 0.02f, 0.008f, 0.012f),
                 };
 
         foreach ((string name, long target, string rewardKey, ETier tier, float successBonus, float destroyBonus,
@@ -312,7 +295,7 @@ public static class Achievements {
 
         foreach ((string name, int target, string rewardKey, ETier tier, float doubleBonus,
                      float logisticsBonus) in defs) {
-            string desc = $"累计完成 {target} 次主抽取路线偏好";
+            string desc = $"累计完成 {target} 次开线抽取";
             list.Add(new AchievementInfo(
                 "成就分类-开线",
                 name,
@@ -339,8 +322,8 @@ public static class Achievements {
                     ("成就-配方学者", 30, "成就奖励-配方核心3", ETier.Silver, 0.003f, 0.003f, 0f),
                     ("配方总览", 60, "成就奖励-当前阶段矩阵4", ETier.Gold, 0.004f, 0.004f, 0.005f),
                     ("成就-配方专家", 100, "成就奖励-当前阶段矩阵8", ETier.Gold, 0.006f, 0.006f, 0.01f),
-                    ("配方馆长", 120, "成就奖励-源点2", ETier.Platinum, 0.01f, 0.008f, 0.015f),
-                    ("成就-万物百科", 150, "成就奖励-源点3", ETier.Platinum, 0.015f, 0.01f, 0.02f),
+                    ("配方馆长", 120, "成就奖励-残片800", ETier.Platinum, 0.01f, 0.008f, 0.015f),
+                    ("成就-万物百科", 150, "成就奖励-残片1000", ETier.Platinum, 0.015f, 0.01f, 0.02f),
                 };
 
         foreach ((string name, int target, string rewardKey, ETier tier, float successBonus, float destroyBonus,
@@ -366,10 +349,10 @@ public static class Achievements {
             ("工艺进阶", 2, "成就奖励-残片300", ETier.Bronze, 0.01f, 0f),
             ("工艺磨合", 3, "成就奖励-残片500", ETier.Silver, 0.015f, 0f),
             ("工艺稳态", 4, "成就奖励-残片500", ETier.Silver, 0.02f, 0f),
-            ("成就-工艺优化", 6, "成就奖励-源点1", ETier.Gold, 0.03f, 0.005f),
-            ("工艺跃迁", 8, "成就奖励-源点2", ETier.Gold, 0.04f, 0.01f),
-            ("工艺巅峰", 10, "成就奖励-源点2", ETier.Gold, 0.05f, 0.015f),
-            ("成就-工艺大师", 12, "成就奖励-源点4", ETier.Platinum, 0.08f, 0.02f),
+            ("成就-工艺优化", 6, "成就奖励-残片800", ETier.Gold, 0.03f, 0.005f),
+            ("工艺跃迁", 8, "成就奖励-残片1000", ETier.Gold, 0.04f, 0.01f),
+            ("工艺巅峰", 10, "成就奖励-残片1000", ETier.Gold, 0.05f, 0.015f),
+            ("成就-工艺大师", 12, "成就奖励-残片2000", ETier.Platinum, 0.08f, 0.02f),
         };
 
         foreach ((string name, int target, string rewardKey, ETier tier, float energyBonus, float powerBonus) in defs) {
@@ -384,6 +367,34 @@ public static class Achievements {
                 () => GrantRewardByKey(rewardKey),
                 energyReductionBonus: energyBonus,
                 powerStageBonus: powerBonus));
+        }
+    }
+
+    private static void AddRecurringAchievements(List<AchievementInfo> list) {
+        var defs =
+            new (string Name, int Target, string RewardKey, ETier Tier, float LogisticsBonus, float DoubleBonus)[] {
+                ("任务推进", 10, "成就奖励-当前阶段矩阵2", ETier.Silver, 0.003f, 0f),
+                ("成就-任务自动化", 100, "成就奖励-循环任务自动领取", ETier.Gold, 0.008f, 0.004f),
+                ("任务永动", 1000, "成就奖励-当前阶段矩阵16", ETier.Platinum, 0.016f, 0.01f),
+            };
+
+        foreach ((string name, int target, string rewardKey, ETier tier, float logisticsBonus,
+                     float doubleBonus) in defs) {
+            string desc = $"累计完成 {target} 次循环任务";
+            Action rewardAction = rewardKey == "成就奖励-循环任务自动领取"
+                ? RecurringTask.UnlockAutoClaim
+                : () => GrantRewardByKey(rewardKey);
+
+            list.Add(new AchievementInfo(
+                "成就分类-循环",
+                name,
+                desc,
+                rewardKey,
+                tier,
+                () => RecurringTask.TotalClaimedCount >= target,
+                rewardAction,
+                logisticsBonus: logisticsBonus,
+                doubleOutputBonus: doubleBonus));
         }
     }
 
@@ -402,10 +413,10 @@ public static class Achievements {
             "成就分类-黑雾",
             "黑雾压制",
             "将黑雾支线推进到“地面压制”阶段",
-            "成就奖励-源点1",
+            "成就奖励-残片800",
             ETier.Silver,
             () => DarkFogCombatManager.GetCurrentStage() >= EDarkFogCombatStage.GroundSuppression,
-            () => GrantRewardByKey("成就奖励-源点1"),
+            () => GrantRewardByKey("成就奖励-残片800"),
             successRateBonus: 0.003f,
             destroyReductionBonus: 0.002f));
         list.Add(new AchievementInfo(
@@ -423,10 +434,10 @@ public static class Achievements {
             "成就分类-黑雾",
             "奇点收束",
             "将黑雾支线推进到“奇点收束”阶段",
-            "成就奖励-源点3",
+            "成就奖励-残片2000",
             ETier.Platinum,
             () => DarkFogCombatManager.GetCurrentStage() >= EDarkFogCombatStage.Singularity,
-            () => GrantRewardByKey("成就奖励-源点3"),
+            () => GrantRewardByKey("成就奖励-残片2000"),
             successRateBonus: 0.006f,
             destroyReductionBonus: 0.004f,
             powerStageBonus: 0.012f));
@@ -477,27 +488,27 @@ public static class Achievements {
             "成就分类-挑战",
             "常规毕业",
             "常规模式下累计 30000 次分馏成功，并解锁 150 个配方与星际物流交互科技",
-            "成就奖励-源点5",
+            "成就奖励-残片2000",
             ETier.Platinum,
             () => !IsSpeedrunMode
                   && totalFractionSuccesses >= 30000
                   && GetUnlockedRecipeCount() >= 150
                   && IsTechUnlocked(TFE星际物流交互),
-            () => GrantRewardByKey("成就奖励-源点5"),
+            () => GrantRewardByKey("成就奖励-残片2000"),
             successRateBonus: 0.02f,
             powerStageBonus: 0.02f));
 
         list.Add(new AchievementInfo(
             "成就分类-挑战",
             "速通毕业",
-            "速通模式下累计 10000 次分馏成功、500 次主抽取路线偏好并解锁星际物流交互科技",
-            "成就奖励-源点3",
+            "速通模式下累计 10000 次分馏成功、500 次开线抽取并解锁星际物流交互科技",
+            "成就奖励-残片2000",
             ETier.Platinum,
             () => IsSpeedrunMode
                   && totalFractionSuccesses >= 10000
                   && TicketRaffle.openingLineDraws >= 500
                   && IsTechUnlocked(TFE星际物流交互),
-            () => GrantRewardByKey("成就奖励-源点3"),
+            () => GrantRewardByKey("成就奖励-残片2000"),
             successRateBonus: 0.02f,
             doubleOutputBonus: 0.02f,
             logisticsBonus: 0.02f));
@@ -508,9 +519,10 @@ public static class Achievements {
         Register("成就系统", "Achievement System");
         Register("成就", "Achievement");
         Register("成就分类-生产", "Production", "生产");
-        Register("成就分类-开线", "Route", "路线");
+        Register("成就分类-开线", "Opening", "开线");
         Register("成就分类-配方", "Recipe", "配方");
         Register("成就分类-成长", "Growth", "成长");
+        Register("成就分类-循环", "Recurring", "循环");
         Register("成就分类-黑雾", "Dark Fog", "黑雾");
         Register("成就分类-挑战", "Challenge", "挑战");
         Register("描述", "Description");
@@ -546,11 +558,6 @@ public static class Achievements {
         Register("成就奖励-残片800", "Fragments x800", "残片 x800");
         Register("成就奖励-残片1000", "Fragments x1000", "残片 x1000");
         Register("成就奖励-残片2000", "Fragments x2000", "残片 x2000");
-        Register("成就奖励-源点1", "Memory x1", "记忆源点 x1");
-        Register("成就奖励-源点2", "Memory x2", "记忆源点 x2");
-        Register("成就奖励-源点3", "Memory x3", "记忆源点 x3");
-        Register("成就奖励-源点4", "Memory x4", "记忆源点 x4");
-        Register("成就奖励-源点5", "Memory x5", "记忆源点 x5");
         Register("成就奖励-当前阶段矩阵2", "Current stage matrix x2", "当前阶段矩阵 x2");
         Register("成就奖励-当前阶段矩阵4", "Current stage matrix x4", "当前阶段矩阵 x4");
         Register("成就奖励-当前阶段矩阵8", "Current stage matrix x8", "当前阶段矩阵 x8");
@@ -560,6 +567,7 @@ public static class Achievements {
         Register("成就奖励-定向原胚1", "Directional Proto x1", "定向原胚 x1");
         Register("成就奖励-星际物流交互站1", "Interstellar Interaction Station x1", "星际物流交互站 x1");
         Register("成就奖励-精馏塔原胚3", "Rectification Tower Proto x3", "精馏塔原胚 x3");
+        Register("成就奖励-循环任务自动领取", "Recurring task auto-claim", "循环任务自动领取");
 
         Register("分馏星河", "Fractionation Galaxy", "分馏星河");
         Register("分馏星海", "Fractionation Starsea", "分馏星海");
@@ -567,9 +575,12 @@ public static class Achievements {
         Register("带速成型", "Throughput Online", "带速成型");
         Register("满带洪流", "Full-Belt Torrent", "满带洪流");
         Register("星河带速", "Galactic Throughput", "星河带速");
-        Register("成就-开线先锋", "Route Pioneer", "路线先锋");
-        Register("开线统筹", "Route Coordination", "路线统筹");
-        Register("开线传说", "Route Legend", "路线传说");
+        Register("成就-任务自动化", "Task Automation");
+        Register("成就-开线先锋", "Opening Pioneer");
+        Register("开线统筹", "Opening Coordination", "开线统筹");
+        Register("开线传说", "Opening Legend", "开线传说");
+        Register("任务推进", "Task Momentum", "任务推进");
+        Register("任务永动", "Task Perpetual", "任务永动");
         Register("成就-配方入门", "Recipe Beginner");
         Register("成就-配方学者", "Recipe Scholar");
         Register("成就-配方专家", "Recipe Expert");
@@ -654,15 +665,6 @@ public static class Achievements {
             return;
         }
 
-        if (flags.Length == recurringTaskAchievementNameOrder.Length) {
-            for (int i = 0; i < flags.Length; i++) {
-                if (flags[i] == '1') {
-                    MarkAchievementByName(recurringTaskAchievementNameOrder[i]);
-                }
-            }
-            return;
-        }
-
         int count = Math.Min(flags.Length, achievements.Length);
         for (int i = 0; i < count; i++) {
             bool obtained = flags[i] == '1';
@@ -672,15 +674,6 @@ public static class Achievements {
     }
 
     private static void ApplyClaimedFlags(bool[] flags) {
-        if (flags.Length == recurringTaskAchievementNameOrder.Length) {
-            for (int i = 0; i < flags.Length; i++) {
-                if (flags[i]) {
-                    MarkAchievementByName(recurringTaskAchievementNameOrder[i]);
-                }
-            }
-            return;
-        }
-
         int count = Math.Min(flags.Length, achievements.Length);
         for (int i = 0; i < count; i++) {
             if (!flags[i]) {
@@ -690,16 +683,6 @@ public static class Achievements {
             unlocked[i] = true;
             claimed[i] = true;
         }
-    }
-
-    private static bool MarkAchievementByName(string nameKey) {
-        if (!achievementIndexByName.TryGetValue(nameKey, out int index)) {
-            return false;
-        }
-
-        unlocked[index] = true;
-        claimed[index] = true;
-        return true;
     }
 
     private static string BuildAchievementFlags() {
@@ -765,6 +748,7 @@ public static class Achievements {
         unlocked[index] = true;
         claimed[index] = true;
         MarkBonusSummaryDirty();
+        achievements[index].GrantReward?.Invoke();
         DevelopmentDiary.TryUnlockRandomFragmentFromAchievement();
 
         if (showPopup) {
@@ -805,7 +789,16 @@ public static class Achievements {
             ("ClaimedFlags", br => { oldClaimed = ReadLegacyFlags(br); })
         );
 
-        migrated = ApplyClaimedFlagsFromSave(saveClaimed) || migrated;
+        int saveCount = Math.Min(saveClaimed.Length, achievements.Length);
+        for (int i = 0; i < saveCount; i++) {
+            if (!saveClaimed[i] || claimed[i]) {
+                continue;
+            }
+
+            unlocked[i] = true;
+            claimed[i] = true;
+            migrated = true;
+        }
 
         int oldCount = Math.Max(oldUnlocked.Length, oldClaimed.Length);
         for (int oldIndex = 0; oldIndex < oldCount && oldIndex < legacyAchievementNameOrder.Length; oldIndex++) {
@@ -842,30 +835,6 @@ public static class Achievements {
             flags[i] = br.ReadBoolean();
         }
         return flags;
-    }
-
-    private static bool ApplyClaimedFlagsFromSave(bool[] flags) {
-        bool changed = false;
-        if (flags.Length == recurringTaskAchievementNameOrder.Length) {
-            for (int i = 0; i < flags.Length; i++) {
-                if (flags[i] && MarkAchievementByName(recurringTaskAchievementNameOrder[i])) {
-                    changed = true;
-                }
-            }
-            return changed;
-        }
-
-        int count = Math.Min(flags.Length, achievements.Length);
-        for (int i = 0; i < count; i++) {
-            if (!flags[i] || claimed[i]) {
-                continue;
-            }
-
-            unlocked[i] = true;
-            claimed[i] = true;
-            changed = true;
-        }
-        return changed;
     }
 
     public static void Export(BinaryWriter w) {
@@ -940,7 +909,7 @@ public static class Achievements {
                         pos: (2, 0),
                         objectName: "achievements-list-card",
                         rows: BuildAchievementListRows(),
-                        cols: [Fr(220), Fr(420), Px(42f), Fr(220), Fr(110)],
+                        cols: [Fr(220), Fr(460), Px(42f), Fr(120), Fr(180)],
                         rowGap: 6f,
                         columnGap: 8f,
                         children: BuildAchievementListNodes()),
@@ -993,7 +962,7 @@ public static class Achievements {
                 pos: (row, 1), objectName: $"txtAchievementDesc{slot}"));
             nodes.Add(ImageButtonNode(size: 40f, onBuilt: btn => rewardIcons[slot] = btn,
                 pos: (row, 2), objectName: $"txtAchievementRewardIcon{slot}"));
-            nodes.Add(TextNode("动态刷新", 13, wrap: true, onBuilt: text => txtAchievementRewards[slot] = text,
+            nodes.Add(TextNode("动态刷新", 13, onBuilt: text => txtAchievementRewards[slot] = text,
                 pos: (row, 3), objectName: $"txtAchievementReward{slot}"));
             nodes.Add(TextNode("动态刷新", 13, onBuilt: text => txtAchievementStates[slot] = text,
                 pos: (row, 4), objectName: $"txtAchievementState{slot}"));
@@ -1149,6 +1118,11 @@ public static class Achievements {
         AddFunctionalRewardText(rewards, "功能奖励-物流", info.LogisticsBonus, positive: true);
         AddFunctionalRewardText(rewards, "功能奖励-发电", info.PowerStageBonus, positive: true);
 
+        if (TryResolveRewardDefinition(info.RewardKey, out AchievementRewardDefinition definition)
+            && definition.UnlockRecurringAutoClaim) {
+            rewards.Add("成就奖励-循环任务自动领取".Translate());
+        }
+
         if (rewards.Count == 0) {
             return "无额外功能奖励".Translate().WithColor(Gray);
         }
@@ -1169,8 +1143,6 @@ public static class Achievements {
         rewards.Add(string.Format(key.Translate(), percent.ToString("0.##")));
     }
 
-    private static void GrantRewardByKey(string rewardKey) { }
-
     private static Color GetTierColor(ETier tier) {
         return tier switch {
             ETier.Bronze => Orange,
@@ -1179,6 +1151,20 @@ public static class Achievements {
             ETier.Platinum => Blue,
             _ => White,
         };
+    }
+
+    private static void GrantRewardByKey(string rewardKey) {
+        if (!TryResolveRewardDefinition(rewardKey, out AchievementRewardDefinition definition)) {
+            return;
+        }
+
+        if (definition.UnlockRecurringAutoClaim) {
+            RecurringTask.UnlockAutoClaim();
+        }
+    }
+
+    private static bool TryResolveRewardDefinition(string rewardKey, out AchievementRewardDefinition definition) {
+        return rewardDefinitionsByKey.TryGetValue(rewardKey, out definition);
     }
 
     private static bool IsTechUnlocked(int techId) {
@@ -1191,6 +1177,6 @@ public static class Achievements {
 
     private static int GetMaxBuildingLevel() {
         return Math.Max(InteractionTower.Level, Math.Max(MineralReplicationTower.Level,
-            Math.Max(ConversionTower.Level, RectificationTower.Level)));
+            Math.Max(PointAggregateTower.Level, Math.Max(ConversionTower.Level, RectificationTower.Level))));
     }
 }

@@ -28,8 +28,7 @@ public static class RecipeManager {
     /// <summary>
     /// 按配方类型分类配方，加快访问速度，格式：[(int)ERecipe][(int)ItemID]
     /// </summary>
-    private static readonly BaseRecipe[][] RecipeTypeArr =
-        new BaseRecipe[Enum.GetValues(typeof(ERecipe)).Cast<int>().Max() + 1][];
+    private static readonly BaseRecipe[][] RecipeTypeArr = new BaseRecipe[Enum.GetNames(typeof(ERecipe)).Length + 1][];
 
     /// <summary>
     /// 按物品科技层级分类配方，Key：(int)MatrixID
@@ -38,7 +37,7 @@ public static class RecipeManager {
     private static bool fracRecipesReady;
 
 #if DEBUG
-    private const string SPRITE_CSV_DIR = @"D:\project\dsp\MLJ_DSPmods\gamedata";
+    private const string SPRITE_CSV_DIR = @"D:\project\csharp\DSP MOD\MLJ_DSPmods\gamedata";
     private const string SPRITE_CSV_PATH = $@"{SPRITE_CSV_DIR}\fracIconPath.csv";
 #endif
 
@@ -60,6 +59,7 @@ public static class RecipeManager {
 
         BuildingTrainRecipe.CreateAll();
         MineralCopyRecipe.CreateAll();
+        PointAggregateRecipe.CreateAll();
         ConversionRecipe.CreateAll();
         RectificationRecipe.CreateAll();
         fracRecipesReady = true;
@@ -112,9 +112,6 @@ public static class RecipeManager {
     /// <param name="inputId">要获取的配方的输入ID</param>
     /// <typeparam name="T">BaseRecipe的子类</typeparam>
     /// <returns>类型为recipeType，输入物品ID为inputId的配方。找不到返回null</returns>
-    /// <summary>
-    /// 按配方类型和输入物品读取分馏配方。
-    /// </summary>
     public static T GetRecipe<T>(ERecipe recipeType, int inputId) where T : BaseRecipe {
         int recipeTypeIndex = (int)recipeType;
         if (recipeTypeIndex <= 0 || recipeTypeIndex >= RecipeTypeArr.Length || inputId <= 0) {
@@ -127,25 +124,13 @@ public static class RecipeManager {
         return recipeArr[inputId] as T;
     }
 
-    /// <summary>
-    /// 获取当前已注册的全部 FE 分馏配方。
-    /// </summary>
     public static IReadOnlyList<BaseRecipe> AllRecipes => RecipeList;
-    /// <summary>
-    /// 判断分馏配方注册流程是否已完成。
-    /// </summary>
     public static bool AreFracRecipesReady => fracRecipesReady;
 
-    /// <summary>
-    /// 按分馏配方类型查询配方列表。
-    /// </summary>
     public static List<BaseRecipe> GetRecipesByType(ERecipe recipeType) {
         return RecipeTypeDic.TryGetValue(recipeType, out List<BaseRecipe> recipeList) ? recipeList : [];
     }
 
-    /// <summary>
-    /// 按矩阵阶段查询配方列表。
-    /// </summary>
     public static List<BaseRecipe> GetRecipesByMatrix(int matrixId) {
         if (matrixId < I电磁矩阵 || matrixId > I宇宙矩阵) {
             //当成黑雾矩阵处理
@@ -155,9 +140,6 @@ public static class RecipeManager {
         }
     }
 
-    /// <summary>
-    /// 查询指定矩阵阶段以下的分层配方列表。
-    /// </summary>
     public static List<List<BaseRecipe>> GetRecipesUnderMatrix(int topMatrixId) {
         List<List<BaseRecipe>> ret = [];
         if (topMatrixId < I电磁矩阵 || topMatrixId > I宇宙矩阵) {
@@ -229,9 +211,6 @@ public static class RecipeManager {
 
     #region 从存档读取配方数据
 
-    /// <summary>
-    /// 从存档读取该分馏域状态。
-    /// </summary>
     public static void Import(BinaryReader r) {
         r.ReadBlocks(
             ("MainRecipes", br => {
@@ -249,9 +228,6 @@ public static class RecipeManager {
         );
     }
 
-    /// <summary>
-    /// 将该分馏域状态写入存档。
-    /// </summary>
     public static void Export(BinaryWriter w) {
         w.WriteBlocks(
             ("MainRecipes", bw => {
@@ -267,9 +243,6 @@ public static class RecipeManager {
         );
     }
 
-    /// <summary>
-    /// 切换或进入其他存档时重置该分馏域状态。
-    /// </summary>
     public static void IntoOtherSave() {
         foreach (var p in RecipeTypeDic) {
             foreach (BaseRecipe recipe in p.Value) {

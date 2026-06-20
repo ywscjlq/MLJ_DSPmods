@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using FE.Logic.Fractionation.Fractionators;
 using UnityEngine;
 using static FE.Logic.Items.ItemManager;
 using static FE.Logic.DataCenter.DataCenterInventory;
@@ -11,8 +10,8 @@ using static FE.Logic.DataCenter.PlayerInventoryAccess;
 namespace FE.Logic.Economy;
 
 /// <summary>
-/// 残片稳定救急兑换。
-/// 只提供有限补差项，不再作为任意生产物资购买入口。
+/// 残片稳定兑换。
+/// 这是保底系统，不参与交易所价格波动。
 /// </summary>
 public static class FragmentExchangeManager {
     /// <summary>
@@ -49,7 +48,16 @@ public static class FragmentExchangeManager {
         if (!MarketValueManager.CanParticipateInEconomy(itemId)) {
             return false;
         }
-        return IsStableRescueItem(itemId);
+        if (itemId == I沙土 || itemId == IFE残片) {
+            return false;
+        }
+        // 按阶段门控：只能兑换当前阶段及下一阶段的物品
+        int currentStage = GetCurrentProgressStageIndex();
+        int itemStage = GetMatrixStageIndex(itemId);
+        if (itemStage > currentStage + 1) {
+            return false;
+        }
+        return true;
     }
 
     public static FragmentQuote GetQuote(int itemId) {
@@ -101,16 +109,6 @@ public static class FragmentExchangeManager {
         return new FragmentQuote(itemId, fragmentCost, stageWeight, premium);
     }
 
-    private static bool IsStableRescueItem(int itemId) {
-        if (Array.IndexOf(MainProgressMatrixIds, itemId) >= 0) {
-            return GetMatrixStageIndex(itemId) <= GetCurrentProgressStageIndex();
-        }
-
-        return FractionatorTowerCatalog.IsActiveFractionatorProtoOrDirectional(itemId)
-               || itemId == IFE行星内物流交互站
-               || itemId == IFE星际物流交互站;
-    }
-
     private static float GetStageWeight(int itemId) {
         int currentStageIndex = GetCurrentProgressStageIndex();
         int itemStageIndex = GetMatrixStageIndex(itemId);
@@ -126,17 +124,15 @@ public static class FragmentExchangeManager {
 
     private static float GetSafetyPremium(int itemId) {
         if (MarketValueManager.IsStoreOfValue(itemId)) {
-            return 2.20f;
+            return 1.60f;  // was 2.20
         }
-        if (FractionatorTowerCatalog.IsActiveFractionatorProtoOrDirectional(itemId)) {
-            return 2.00f;
+        if (itemId >= IFE交互塔原胚 && itemId <= IFE分馏塔定向原胚) {
+            return 1.50f;  // was 2.00
         }
-        if (FractionatorTowerCatalog.IsActiveFractionator(itemId)
-            || itemId == IFE行星内物流交互站
-            || itemId == IFE星际物流交互站) {
-            return 1.80f;
+        if (itemId >= IFE交互塔 && itemId <= IFE星际物流交互站) {
+            return 1.40f;  // was 1.80
         }
-        return 1.45f;
+        return 1.15f;  // was 1.45
     }
 
     public static void Import(BinaryReader r) {
@@ -177,4 +173,12 @@ public static class FragmentExchangeManager {
         Init();
         TotalExchangeCount = 0;
     }
+
+    /// <summary>
+    /// 返回当前阶段可兑换物品的 max stage，用于 UI 提示。
+    /// </summary>
+    public static int GetMaxExchangeableStage() {
+        return GetCurrentProgressStageIndex() + 1;
+    }
+
 }

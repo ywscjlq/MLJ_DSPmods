@@ -4,7 +4,6 @@ using System.IO;
 using static FE.Logic.Items.ItemManager;
 using static FE.Utils.Utils;
 using static FE.Logic.DataCenter.DataCenterInventory;
-using static FE.Utils.Utils;
 
 namespace FE.Logic.DarkFog;
 

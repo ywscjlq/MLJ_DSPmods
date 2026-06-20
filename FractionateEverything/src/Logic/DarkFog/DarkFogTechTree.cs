@@ -6,7 +6,6 @@ using static FE.Logic.Items.ItemManager;
 using static FE.Utils.Utils;
 using static FE.Logic.DataCenter.DataCenterInventory;
 using static FE.Logic.DataCenter.PlayerInventoryAccess;
-using static FE.Logic.DataCenter.DataCenterInventory;
 using static FE.Logic.DataCenter.PlayerInventoryAccess;
 
 namespace FE.Logic.DarkFog;

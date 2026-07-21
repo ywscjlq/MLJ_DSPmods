@@ -21,7 +21,7 @@ public static partial class TechManager {
         );
         tech分馏数据中心.PreTechsImplicit = [T电磁矩阵];
         tech分馏数据中心.AddItems = [IFE交互塔原胚];
-        tech分馏数据中心.AddItemCounts = [80];//20用于解锁分馏塔原胚科技，60赠送
+        tech分馏数据中心.AddItemCounts = [80];//启动套件中的基础交互塔原胚
         tech分馏数据中心.PropertyOverrideItems = [I电磁矩阵];
         tech分馏数据中心.PropertyItemCounts = [10];
         tech分馏数据中心.IconTag = "flsjzx";
@@ -63,7 +63,7 @@ public static partial class TechManager {
             GetTechPos(0, 3)
         );
         tech超值礼包3.PreTechsImplicit = [T结构矩阵];
-        tech超值礼包3.AddItems = [IFE残片, IFE点数聚集塔原胚];
+        tech超值礼包3.AddItems = [IFE残片, IFE转化塔原胚];
         tech超值礼包3.AddItemCounts = [500, 10];
         tech超值礼包3.PropertyOverrideItems = [I结构矩阵];
         tech超值礼包3.PropertyItemCounts = [100];
@@ -105,8 +105,8 @@ public static partial class TechManager {
             GetTechPos(0, 6)
         );
         tech超值礼包6.PreTechsImplicit = [T宇宙矩阵];
-        tech超值礼包6.AddItems = [IFE残片, IFE分馏塔定向原胚];
-        tech超值礼包6.AddItemCounts = [1200, 2];
+        tech超值礼包6.AddItems = [IFE残片, IFE交互塔原胚, IFE矿物复制塔原胚, IFE转化塔原胚, IFE精馏塔原胚];
+        tech超值礼包6.AddItemCounts = [1200, 2, 2, 2, 2];
         tech超值礼包6.PropertyOverrideItems = [I宇宙矩阵];
         tech超值礼包6.PropertyItemCounts = [100];
         tech超值礼包6.IconTag = "tczlb6";
@@ -118,8 +118,8 @@ public static partial class TechManager {
             [],
             GetTechPos(1, 1)
         );
-        tech分馏塔原胚.AddItems = [IFE交互塔, IFE交互塔原胚, IFE矿物复制塔原胚, IFE分馏塔定向原胚];
-        tech分馏塔原胚.AddItemCounts = [1, 30, 30, 20];
+        tech分馏塔原胚.AddItems = [IFE交互塔, IFE交互塔原胚, IFE矿物复制塔原胚, IFE转化塔原胚, IFE精馏塔原胚];
+        tech分馏塔原胚.AddItemCounts = [1, 30, 30, 20, 20];
         tech分馏塔原胚.PropertyOverrideItems = [I电磁矩阵];
         tech分馏塔原胚.PropertyItemCounts = [100];
         tech分馏塔原胚.IconTag = "tfltyp";
@@ -147,18 +147,6 @@ public static partial class TechManager {
         tech矿物复制.PropertyOverrideItems = [I电磁矩阵];
         tech矿物复制.PropertyItemCounts = [200];
         tech矿物复制.IconTag = "tkwfz";
-
-        var tech增产点数聚集 = ProtoRegistry.RegisterTech(
-            TFE增产点数聚集, "T增产点数聚集", "增产点数聚集描述", "增产点数聚集结果", "Assets/fe/tech增产点数聚集",
-            [],
-            [IFE万物分馏科技解锁说明], [1], 3600000,
-            [RFE点数聚集塔],
-            GetTechPos(1, 4)
-        );
-        tech增产点数聚集.PreTechsImplicit = [TFE分馏塔原胚];
-        tech增产点数聚集.PropertyOverrideItems = [I电磁矩阵];
-        tech增产点数聚集.PropertyItemCounts = [200];
-        tech增产点数聚集.IconTag = "zcdsjj";
 
         var tech物品转化 = ProtoRegistry.RegisterTech(
             TFE物品转化, "T物品转化", "物品转化描述", "物品转化结果", "Assets/fe/tech物品转化",

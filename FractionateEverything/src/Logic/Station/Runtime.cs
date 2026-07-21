@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using FE.Logic.DataCenter;
 using FE.Logic.Fractionation.Fractionators;
 using FE.Logic.Station.Definitions;
 using FE.UI.MainPanel.Setting;
@@ -205,6 +206,7 @@ public static partial class StationManager {
                                 break;
                             }
                         }
+
                     }
                 }
             }
@@ -222,55 +224,51 @@ public static partial class StationManager {
     private static void SetTargetCount(this StationComponent stationComponent, int index, int targetCount,
         long maxSlotEnergy) {
         ref StationStore store = ref stationComponent.storage[index];
-        try {
-            if (store.count == targetCount || itemValue[store.itemId] == float.MaxValue) {
-                return;
-            }
-
-            ItemProto itemProto = LDB.items.Select(IFE行星内物流交互站);
-            // 物品价值(100价值=1000000J=1MJ，即每1价值，耗电10000J)
-            float cost = (float)Math.Sqrt(itemValue[store.itemId]) * 10000 * itemProto.InteractEnergyRatio();
-            if (store.count < targetCount) {
-                // 将数据中心的物品下载到交互站
-                int count = targetCount - store.count;
-                // 总耗电大于剩余电量，修改数量
-                if (cost * count > maxSlotEnergy) {
-                    // 1个都玩不起直接放弃
-                    if (cost > maxSlotEnergy) {
-                        return;
-                    }
-
-                    count = Mathf.FloorToInt(maxSlotEnergy / cost);
-                }
-
-                count = TakeItemFromModData(store.itemId, count, out int inc);
-                store.count += count;
-                store.inc += inc;
-                stationComponent.energy -= Mathf.CeilToInt(cost * count);
-                BuildingGrowthService.AddBuildingExp(IFE行星内物流交互站, count);
-            } else {
-                // 将交互站的物品上传到数据中心
-                int count = store.count - targetCount;
-                // 总耗电大于剩余电量，修改数量
-                if (cost * count > maxSlotEnergy) {
-                    // 1个都玩不起直接放弃
-                    if (cost > maxSlotEnergy) {
-                        return;
-                    }
-
-                    count = Mathf.FloorToInt(maxSlotEnergy / cost);
-                }
-
-                int inc = store.count <= 0 ? 0 : split_inc(ref store.count, ref store.inc, count);
-                AddItemToModData(store.itemId, count, inc);
-                stationComponent.energy -= Mathf.CeilToInt(cost * count);
-                BuildingGrowthService.AddBuildingExp(IFE行星内物流交互站, count);
-            }
+        if (store.count == targetCount || itemValue[store.itemId] == float.MaxValue) {
+            return;
         }
-        finally {
-            if (PlanetaryInteractionStation.Level >= 3) {
-                AddIncToItem(store.count, ref store.inc);
+
+        ItemProto itemProto = LDB.items.Select(IFE行星内物流交互站);
+        // 物品价值(100价值=1000000J=1MJ，即每1价值，耗电10000J)
+        float cost = (float)Math.Sqrt(itemValue[store.itemId]) * 10000 * itemProto.InteractEnergyRatio();
+        if (store.count < targetCount) {
+            // 将数据中心的物品下载到交互站
+            int count = targetCount - store.count;
+            // 总耗电大于剩余电量，修改数量
+            if (cost * count > maxSlotEnergy) {
+                // 1个都玩不起直接放弃
+                if (cost > maxSlotEnergy) {
+                    return;
+                }
+
+                count = Mathf.FloorToInt(maxSlotEnergy / cost);
             }
+
+            count = TakeItemFromModData(store.itemId, count, out int inc);
+            if (PlanetaryInteractionStation.Level >= 3) {
+                AddIncToDownloadedItem(count, ref inc, PlanetaryInteractionStation.Level >= 12);
+            }
+            store.count += count;
+            store.inc += inc;
+            stationComponent.energy -= Mathf.CeilToInt(cost * count);
+            BuildingGrowthService.AddBuildingExp(IFE行星内物流交互站, count);
+        } else {
+            // 将交互站的物品上传到数据中心
+            int count = store.count - targetCount;
+            // 总耗电大于剩余电量，修改数量
+            if (cost * count > maxSlotEnergy) {
+                // 1个都玩不起直接放弃
+                if (cost > maxSlotEnergy) {
+                    return;
+                }
+
+                count = Mathf.FloorToInt(maxSlotEnergy / cost);
+            }
+
+            int inc = store.count <= 0 ? 0 : split_inc(ref store.count, ref store.inc, count);
+            DataCenterUploadRouter.Upload(store.itemId, count, inc);
+            stationComponent.energy -= Mathf.CeilToInt(cost * count);
+            BuildingGrowthService.AddBuildingExp(IFE行星内物流交互站, count);
         }
     }
 

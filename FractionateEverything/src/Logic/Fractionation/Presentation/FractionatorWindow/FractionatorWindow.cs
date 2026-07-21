@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using FE.Logic.Fractionation.Fractionators;
 using UnityEngine;
 using UnityEngine.UI;
 using static FE.Utils.Utils;
@@ -21,7 +22,7 @@ public static partial class FractionatorWindow {
     private const float SlotSpacing = 55f;
     // AddWidth = SlotSpacing * (Mathf.Max(MaxMainSlots, MaxSideSlots) - 1);
     private const float AddWidth = SlotSpacing * 3;
-    private const float AddHeight = 380f; // 增至380px，给词缀区足够独立空间
+    private const float AddHeight = 70f;
 
     // ===== 颜色 =====
     private static readonly Color ProbColor = Orange;
@@ -71,23 +72,50 @@ public static partial class FractionatorWindow {
     private static Vector3 _oriBoxLocalPos;
     private static Vector3 _speedArrowParentLocalPos;
     private static float _layoutOffsetX;
-    
-    // 词缀独立文本区 (避免追加到stateText导致遮挡/超出)
-    private static Text _affixText;
 
     /// <summary>
     /// 分馏塔窗口单个产物槽位的 UI 引用。
     /// </summary>
     private class ProductSlot {
+        /// <summary>
+        /// 保存产物槽根对象。
+        /// </summary>
         public GameObject go;
+        /// <summary>
+        /// 保存产物槽物品图标。
+        /// </summary>
         public Image icon;
+        /// <summary>
+        /// 保存产物槽按钮组件。
+        /// </summary>
         public UIButton button;
+        /// <summary>
+        /// 保存产物槽数量文本。
+        /// </summary>
         public Text countText;
+        /// <summary>
+        /// 保存产物槽概率文本。
+        /// </summary>
         public Text probText;
+        /// <summary>
+        /// 保存产物槽锁定图标。
+        /// </summary>
         public Image lockIcon;
+        /// <summary>
+        /// 保存产物槽增产点箭头图标数组。
+        /// </summary>
         public Image[] incArrows;
+        /// <summary>
+        /// 保存产物槽显示类型。
+        /// </summary>
         public ProductSlotKind kind;
+        /// <summary>
+        /// 保存产物槽左键点击处理器。
+        /// </summary>
         public Action<int> clickHandler;
+        /// <summary>
+        /// 保存产物槽右键点击处理器。
+        /// </summary>
         public Action<int> rightClickHandler;
     }
 
@@ -170,7 +198,7 @@ public static partial class FractionatorWindow {
         FractionatorComponent frac = factory.factorySystem.fractionatorPool[fractionatorId];
         if (frac.id != fractionatorId) return false;
         int buildingId = factory.entityPool[frac.entityId].protoId;
-        return buildingId >= IFE交互塔 && buildingId <= IFE精馏塔;
+        return FractionatorTowerCatalog.IsActiveFractionator(buildingId);
     }
 
     private static void OnSlotClick(ProductSlot slot, int itemId) {

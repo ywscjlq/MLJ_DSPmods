@@ -1,9 +1,5 @@
-using System.Linq;
 using FE.Compatibility.Mods;
-using FE.Logic.Economy;
-using FE.Logic.Gacha;
 using FE.Logic.Items;
-using static FE.Logic.DarkFog.DarkFogTaskManager;
 using UnityEngine;
 using static FE.Utils.Utils;
 using static FE.Logic.DataCenter.PlayerInventoryAccess;
@@ -112,8 +108,6 @@ public static class DarkFogCombatManager {
             hasActiveEvent, enhancedNodeCount, stage);
         cachedFrame = frame;
         cachedGameTick = gameTick;
-        // 通知任务系统阶段变化
-        DarkFogTaskManager.OnStageChanged(cachedSnapshot.Stage);
         return cachedSnapshot;
     }
 
@@ -226,39 +220,6 @@ public static class DarkFogCombatManager {
     public static int GetEnhancedNodeCount() => GetSnapshot().EnhancedNodeCount;
     public static EDarkFogCombatStage GetCurrentStage() => GetSnapshot().Stage;
     public static bool IsGrowthOfferUnlocked() => GetCurrentStage() >= EDarkFogCombatStage.Signal;
-    public static bool IsSpecialOrderUnlocked() => GetCurrentStage() >= EDarkFogCombatStage.GroundSuppression;
-
-    public static int GetUnlockedGrowthOfferCount() {
-        return GachaService.GetGrowthOffers().Count(offer => offer.ExtraCostItemId == I黑雾矩阵);
-    }
-
-    public static int GetUnlockedSpecialOrderCount() {
-        return MarketBoardManager.ActiveOffers.Count(IsDarkFogOffer);
-    }
-
-    public static bool IsDarkFogOffer(MarketBoardManager.MarketOffer offer) {
-        return offer.InputItemId == I黑雾矩阵
-               || offer.ExtraInputItemId == I黑雾矩阵
-               || offer.OutputItemId == I黑雾矩阵
-               || offer.OutputItemId == I能量碎片
-               || offer.OutputItemId == I物质重组器
-               || offer.OutputItemId == I硅基神经元
-               || offer.OutputItemId == I负熵奇点
-               || offer.OutputItemId == I核心素
-               || offer.OutputItemId == I重组式制造台
-               || offer.OutputItemId == I自演化研究站
-               || offer.OutputItemId == I负熵熔炉
-               || offer.OutputItemId == I奇异湮灭燃料棒
-               || offer.OutputItemId == IFE分馏塔定向原胚;
-    }
-
-    public static bool IsEnhancedDarkFogOffer(MarketBoardManager.MarketOffer offer) {
-        return IsDarkFogOffer(offer) && IsEnhancedRewardItem(offer.OutputItemId);
-    }
-
-    public static bool IsEnhancedRewardItem(int itemId) {
-        return itemId == IFE分馏塔定向原胚;
-    }
 
     public static int GetNextUnlockMatrixId() {
         return GetCurrentStage() switch {

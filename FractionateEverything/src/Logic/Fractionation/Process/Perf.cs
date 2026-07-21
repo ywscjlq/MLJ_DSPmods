@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Text;
+using FE.Logic.Fractionation.Fractionators;
 using static FE.Utils.Utils;
 
 namespace FE.Logic.Fractionation.Process;
@@ -56,7 +57,7 @@ public static partial class ProcessManager {
         fractionatorPerfTicks[bucket] += elapsedTicks;
         UpdateFractionatorPerfMax(fractionatorPerfMaxTicks, bucket, elapsedTicks);
 
-        int handlerIndex = buildingID - IFE交互塔;
+        int handlerIndex = FractionatorTowerCatalog.GetActiveFractionatorIndex(buildingID);
         if (bucket == FractionatorPerfUpdateFe
             && handlerIndex >= 0
             && handlerIndex < fractionatorPerfFeUpdateCallsByType.Length) {
@@ -76,6 +77,9 @@ public static partial class ProcessManager {
         UpdateFractionatorPerfMax(fractionatorPerfStageMaxTicks, stage, elapsedTicks);
     }
 
+    /// <summary>
+    /// 记录分馏塔热路径指定阶段的性能耗时。
+    /// </summary>
     public static void RecordFractionatorPerfDetail(int detail, long elapsedTicks) {
         if (!EnableFractionatorPerfProbe) {
             return;
@@ -202,8 +206,6 @@ public static partial class ProcessManager {
                + ";"
                + FormatFeType(IFE矿物复制塔, calls, ticks)
                + ";"
-               + FormatFeType(IFE点数聚集塔, calls, ticks)
-               + ";"
                + FormatFeType(IFE转化塔, calls, ticks)
                + ";"
                + FormatFeType(IFE精馏塔, calls, ticks);
@@ -254,7 +256,10 @@ public static partial class ProcessManager {
     }
 
     private static string FormatFeType(int buildingID, long[] calls, long[] ticks) {
-        int index = buildingID - IFE交互塔;
+        int index = FractionatorTowerCatalog.GetActiveFractionatorIndex(buildingID);
+        if (index < 0 || index >= calls.Length) {
+            return $"{buildingID}:0/0.000us";
+        }
         long callCount = calls[index];
         double avgUs = callCount > 0 ? ticks[index] * 1000000.0 / Stopwatch.Frequency / callCount : 0.0;
         return $"{buildingID}:{callCount}/{avgUs:F3}us";

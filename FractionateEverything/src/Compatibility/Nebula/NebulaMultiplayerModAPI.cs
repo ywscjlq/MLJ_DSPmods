@@ -3,7 +3,6 @@ using System.IO;
 using System.Reflection;
 using BepInEx.Bootstrap;
 using FE.Logic.Buildings;
-using FE.Logic.Fractionation.Growth;
 using FE.Logic.Fractionation.FracRecipes;
 using FE.Logic.Fractionation.Process;
 using FE.Logic.Fractionation.Fractionators;
@@ -84,6 +83,24 @@ public class CenterItemChangePacket {
 }
 
 /// <summary>
+/// 数据中心大额物品变化的联机同步包。
+/// </summary>
+public class CenterItemChangeLongPacket {
+    public byte[] data { get; set; }
+
+    public CenterItemChangeLongPacket() { }
+
+    public CenterItemChangeLongPacket(int itemId, long count, long inc = 0) {
+        using IWriterProvider p = NebulaModAPI.GetBinaryWriter();
+        BinaryWriter w = p.BinaryWriter;
+        w.Write(itemId);
+        w.Write(count);
+        w.Write(inc);
+        data = p.CloseAndGetBytes();
+    }
+}
+
+/// <summary>
 /// 在多人游戏中，当物品发生改变时，向其他玩家推送此事件。
 /// </summary>
 [RegisterPacketProcessor]
@@ -102,57 +119,17 @@ public class CenterItemChangePacketProcessor : BasePacketProcessor<CenterItemCha
 }
 
 /// <summary>
-/// 分馏配方等级与经验变化的联机同步包。
-/// </summary>
-public class RecipeChangePacket {
-    public int eRecipe { get; set; }
-    public int inputId { get; set; }
-    public int packetType { get; set; }
-    public int intVal { get; set; } = 0;
-    public float floatVal { get; set; } = 0;
-
-    /// <summary>
-    /// 空构造方法必须保留
-    /// </summary>
-    public RecipeChangePacket() { }
-
-    public RecipeChangePacket(ERecipe eRecipe, int inputId, int packetType) {
-        this.eRecipe = Convert.ToInt32(eRecipe);
-        this.inputId = inputId;
-        this.packetType = packetType;
-    }
-
-    public RecipeChangePacket(ERecipe eRecipe, int inputId, int packetType, int intVal) {
-        this.eRecipe = Convert.ToInt32(eRecipe);
-        this.inputId = inputId;
-        this.packetType = packetType;
-        this.intVal = intVal;
-    }
-
-    public RecipeChangePacket(ERecipe eRecipe, int inputId, int packetType, float floatVal) {
-        this.eRecipe = Convert.ToInt32(eRecipe);
-        this.inputId = inputId;
-        this.packetType = packetType;
-        this.floatVal = floatVal;
-    }
-}
-
-/// <summary>
-/// 在多人游戏中，当配方发生改变时，向其他玩家推送此事件。
+/// 在多人游戏中，当大额物品发生改变时，向其他玩家推送此事件。
 /// </summary>
 [RegisterPacketProcessor]
-public class RecipeChangePacketProcessor : BasePacketProcessor<RecipeChangePacket> {
-    public override void ProcessPacket(RecipeChangePacket packet, INebulaConnection conn) {
-        BaseRecipe recipe = RecipeManager.GetRecipe<BaseRecipe>((ERecipe)packet.eRecipe, packet.inputId);
-        RecipeGrowthContext context = RecipeGrowthManager.BuildContext();
-        switch (packet.packetType) {
-            case 1:
-                RecipeGrowthExecutor.ApplyDrawReward(recipe, context);
-                break;
-            case 2:
-                RecipeGrowthExecutor.SetLevelForSandbox(recipe, packet.intVal, context);
-                break;
-        }
+public class CenterItemChangeLongPacketProcessor : BasePacketProcessor<CenterItemChangeLongPacket> {
+    public override void ProcessPacket(CenterItemChangeLongPacket packet, INebulaConnection conn) {
+        using IReaderProvider p = NebulaModAPI.GetBinaryReader(packet.data);
+        BinaryReader r = p.BinaryReader;
+        int itemId = r.ReadInt32();
+        long count = r.ReadInt64();
+        long inc = r.ReadInt64();
+        AddItemToModData(itemId, count, inc);
         if (NebulaModAPI.IsMultiplayerActive && IsHost) {
             NebulaModAPI.MultiplayerSession.Network.SendPacketExclude(packet, conn);
         }
@@ -212,6 +189,9 @@ public class BuildingChangePacketProcessor : BasePacketProcessor<BuildingChangeP
                 break;
             case 2:
                 FractionatorSingleLock.ApplyLockedOutputPacket(packet.planetId, packet.entityId, packet.itemId);
+                break;
+            case 3:
+                RectificationTuningTarget.ApplyTuningTargetPacket(packet.planetId, packet.entityId, packet.itemId);
                 break;
         }
         if (NebulaModAPI.IsMultiplayerActive && IsHost) {

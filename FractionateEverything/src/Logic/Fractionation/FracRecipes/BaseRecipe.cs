@@ -1,21 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using FE.Logic.Fractionation.Growth;
 using FE.Logic.Fractionation.Process;
-using FE.Logic.Gacha;
 using static FE.Utils.Utils;
 
 namespace FE.Logic.Fractionation.FracRecipes;
-
-/// <summary>
-/// 配方在成长系统中的职责分类。
-/// </summary>
-public enum ERecipeGrowthRole {
-    Production = 0,
-    ToolUnlock = 1,
-    SpecialGrowth = 2,
-}
 
 /// <summary>
 /// 分馏配方基类
@@ -25,10 +14,13 @@ public abstract class BaseRecipe(
     float baseSuccessRatio,
     List<OutputInfo> outputMain,
     List<OutputInfo> outputAppend) {
-    public string TypeName => $"{RecipeType.GetShortName()}-{LDB.items.Select(InputID).name}"
-                              + (RecipeGrowthQueries.IsUnlocked(this)
-                                  ? $" Lv{RecipeGrowthQueries.GetLevel(this)}"
-                                  : "");
+    /// <summary>
+    /// 获取配方类型和输入物品组成的显示名称。
+    /// </summary>
+    public string TypeName => $"{RecipeType.GetShortName()}-{LDB.items.Select(InputID).name}";
+    /// <summary>
+    /// 获取带矩阵阶段颜色的配方显示名称。
+    /// </summary>
     public string TypeNameWC => TypeName.WithColor(MatrixID - I电磁矩阵);
 
     #region 配方类型、输入输出
@@ -37,11 +29,6 @@ public abstract class BaseRecipe(
     /// 类型
     /// </summary>
     public abstract ERecipe RecipeType { get; }
-
-    /// <summary>
-    /// 配方成长语义。用于区分生产型、工具/解锁型、特殊成长型。
-    /// </summary>
-    public virtual ERecipeGrowthRole GrowthRole => ERecipeGrowthRole.Production;
 
     /// <summary>
     /// 输入物品的ID
@@ -60,15 +47,7 @@ public abstract class BaseRecipe(
     /// <summary>
     /// 配方损毁率，数值越大时，增产剂对分馏效果越有明显提升
     /// </summary>
-    public virtual float DestroyRatio {
-        get {
-            const float BaseDestroyRate = 0.04f;
-            float raw = BaseDestroyRate;
-            float reduce = GachaGalleryBonusManager.GetDestroyReduction(RecipeType);
-            float result = raw - reduce;
-            return result > 0f ? result : 0f;
-        }
-    }
+    public virtual float DestroyRatio => 0.04f;
 
     /// <summary>
     /// 主产物信息，概率之和必须为100%。
@@ -85,16 +64,6 @@ public abstract class BaseRecipe(
     public List<OutputInfo> OutputAppend => outputAppend;
 
     /// <summary>
-    /// 原料不消耗概率
-    /// </summary>
-    public float RemainInputRatio => RecipeGrowthQueries.GetRemainInputRatio(this);
-
-    /// <summary>
-    /// 产物翻倍概率
-    /// </summary>
-    public float DoubleOutputRatio => RecipeGrowthQueries.GetDoubleOutputRatio(this);
-
-    /// <summary>
     /// 获取某次输出的执行结果。
     /// 可能的情况有：损毁、产出产物、无变化（直通）。
     /// </summary>
@@ -105,6 +74,9 @@ public abstract class BaseRecipe(
     /// <param name="fluidInputInc">该分馏塔当前的全部增产点数，将在该方法中被修改</param>
     /// <param name="inputChange">原材料会变成几个（-1表示消耗，0表示保留）</param>
     /// <param name="outputs">损毁返回null，直通返回空List，成功返回输出产物</param>
+    /// <summary>
+    /// 执行单次完整分馏结算并写回主产物、副产物和输入保留结果。
+    /// </summary>
     public virtual void GetOutputs(ref uint seed, float pointsBonus, float successBoost,
         int fluidInputIncAvg, ref int fluidInputInc, out int inputChange, out List<ProductOutputInfo> outputs) {
         // 1. 损毁判定
@@ -118,7 +90,6 @@ public abstract class BaseRecipe(
         // 2. 成功判定
         if (GetRandDouble(ref seed) < SuccessRatio * (1 + pointsBonus) * (1 + successBoost)) {
             List<ProductOutputInfo> list = [];
-            RecipeGrowthQueries.GetProcessingRatios(this, out float remainInputRatio, out float doubleOutputRatio);
             // 主输出判定，由于主输出概率之和为100%，所以必定输出且只会输出其中一个
             double ratio = GetRandDouble(ref seed);
             float ratioMain = 0.0f;// 用于累计概率
@@ -131,11 +102,6 @@ public abstract class BaseRecipe(
                     countAvg -= countReal;
                     if (countAvg > 0.0001 && GetRandDouble(ref seed) < countAvg) {
                         countReal++;
-                    }
-
-                    // 产物翻倍判定
-                    if (GetRandDouble(ref seed) < doubleOutputRatio) {
-                        countReal *= 2;
                     }
 
                     if (countReal > 0) {
@@ -162,11 +128,8 @@ public abstract class BaseRecipe(
             }
 
             if (list.Count > 0) {
-                // 原料不消耗判定
-                inputChange = (GetRandDouble(ref seed) < remainInputRatio) ? 0 : -1;
-                if (inputChange < 0) {
-                    fluidInputInc -= fluidInputIncAvg;
-                }
+                inputChange = -1;
+                fluidInputInc -= fluidInputIncAvg;
                 outputs = list;
                 return;
             }
@@ -184,6 +147,9 @@ public abstract class BaseRecipe(
         outputs = ProcessManager.emptyOutputs;
     }
 
+    /// <summary>
+    /// 执行单次轻量分馏结算，供运行热路径减少分配使用。
+    /// </summary>
     public virtual FractionationOutcome GetOutputsFast(ref uint seed, float pointsBonus, float successBoost,
         int fluidInputIncAvg, ref int fluidInputInc, out int inputChange, ProductOutputBuffer outputs) {
         outputs.Clear();
@@ -197,16 +163,12 @@ public abstract class BaseRecipe(
 
         // 2. 成功判定
         if (GetRandDouble(ref seed) < SuccessRatio * (1 + pointsBonus) * (1 + successBoost)) {
-            RecipeGrowthQueries.GetProcessingRatios(this, out float remainInputRatio, out float doubleOutputRatio);
             double ratio = GetRandDouble(ref seed);
             float ratioMain = 0.0f;
             foreach (var outputInfo in OutputMain) {
                 ratioMain += outputInfo.SuccessRatio;
                 if (ratio <= ratioMain) {
                     int countReal = RollOutputCount(ref seed, outputInfo.OutputCount);
-                    if (GetRandDouble(ref seed) < doubleOutputRatio) {
-                        countReal *= 2;
-                    }
                     if (countReal > 0) {
                         outputs.Add(true, outputInfo.OutputID, countReal);
                         outputInfo.OutputTotalCount += countReal;
@@ -226,10 +188,8 @@ public abstract class BaseRecipe(
             }
 
             if (outputs.Count > 0) {
-                inputChange = GetRandDouble(ref seed) < remainInputRatio ? 0 : -1;
-                if (inputChange < 0) {
-                    fluidInputInc -= fluidInputIncAvg;
-                }
+                inputChange = -1;
+                fluidInputInc -= fluidInputIncAvg;
                 return FractionationOutcome.Produced;
             }
 
@@ -244,6 +204,9 @@ public abstract class BaseRecipe(
         return FractionationOutcome.PassThrough;
     }
 
+    /// <summary>
+    /// 执行批量轻量分馏结算，供运行热路径合并多次处理。
+    /// </summary>
     public virtual FractionationBatchResult GetOutputsBatchFast(ref uint seed, float pointsBonus, float successBoost,
         int batchCount, int fluidInputIncAvg, ref int fluidInputInc, ProductOutputBuffer outputs) {
         outputs.Clear();
@@ -252,16 +215,7 @@ public abstract class BaseRecipe(
         int aliveCount = batchCount - destroyedCount;
         float successRatio = SuccessRatio * (1 + pointsBonus) * (1 + successBoost);
         int successCount = RollBinomialApprox(ref seed, aliveCount, successRatio);
-        // 流派冲突: 薛定谔产物 (📦+🌌) — 50%产出×倍率, 50%为0
-        successCount = FE.Logic.Fractionation.Affix.FracAffixManager.ApplySchrödinger(successCount, ref seed);
         int passThroughCount = aliveCount - successCount;
-
-        RecipeGrowthQueries.GetProcessingRatios(this, out float remainInputRatio, out float doubleOutputRatio);
-        // 流派冲突: 永动协议 — 原料不消耗概率额外加成
-        remainInputRatio += ProcessManager.CurrentAffixRemainInputBonus;
-        if (remainInputRatio > 1f) remainInputRatio = 1f;
-        int remainInputCount = RollBinomialApprox(ref seed, successCount, remainInputRatio);
-        int successConsumedCount = successCount - remainInputCount;
 
         int remainingMainCount = successCount;
         float remainingMainRatio = 1.0f;
@@ -275,17 +229,15 @@ public abstract class BaseRecipe(
             if (remainingMainRatio <= 0f) {
                 remainingMainRatio = 1.0f;
             }
-            AddRolledOutput(ref seed, outputs, outputInfo, true, outputHits, doubleOutputRatio);
+            AddRolledOutput(ref seed, outputs, outputInfo, true, outputHits);
         }
 
         foreach (var outputInfo in OutputAppend) {
-                        float adjustedRatio = outputInfo.SuccessRatio * ProcessManager.CurrentAffixAppendRatio;
-            if (adjustedRatio > 1f) adjustedRatio = 1f;
-            int outputHits = RollBinomialApprox(ref seed, successCount, adjustedRatio);
-            AddRolledOutput(ref seed, outputs, outputInfo, false, outputHits, 0f);
+            int outputHits = RollBinomialApprox(ref seed, successCount, outputInfo.SuccessRatio);
+            AddRolledOutput(ref seed, outputs, outputInfo, false, outputHits);
         }
 
-        int inputRemoveCount = destroyedCount + passThroughCount + successConsumedCount;
+        int inputRemoveCount = destroyedCount + passThroughCount + successCount;
         fluidInputInc -= fluidInputIncAvg * inputRemoveCount;
         if (fluidInputInc < 0) {
             fluidInputInc = 0;
@@ -297,12 +249,16 @@ public abstract class BaseRecipe(
             SuccessCount = successCount,
             DestroyedCount = destroyedCount,
             PassThroughCount = passThroughCount,
+            PassThroughInc = fluidInputIncAvg * passThroughCount,
         };
         return result;
     }
 
+    /// <summary>
+    /// 按输出概率和数量随机结算一条产物并加入缓存。
+    /// </summary>
     protected static void AddRolledOutput(ref uint seed, ProductOutputBuffer outputs, OutputInfo outputInfo,
-        bool isMainOutput, int outputHits, float doubleOutputRatio) {
+        bool isMainOutput, int outputHits) {
         if (outputHits <= 0) {
             return;
         }
@@ -310,10 +266,6 @@ public abstract class BaseRecipe(
         int baseCount = (int)outputInfo.OutputCount;
         float fractionalCount = outputInfo.OutputCount - baseCount;
         int totalCount = outputHits * baseCount + RollBinomialApprox(ref seed, outputHits, fractionalCount);
-        if (doubleOutputRatio > 0f) {
-            int doubleHits = RollBinomialApprox(ref seed, outputHits, doubleOutputRatio);
-            totalCount += doubleHits * baseCount + RollBinomialApprox(ref seed, doubleHits, fractionalCount);
-        }
         if (totalCount <= 0) {
             return;
         }
@@ -322,6 +274,9 @@ public abstract class BaseRecipe(
         outputInfo.OutputTotalCount += totalCount;
     }
 
+    /// <summary>
+    /// 按小数产量随机取整得到实际输出数量。
+    /// </summary>
     protected static int RollOutputCount(ref uint seed, float outputCount) {
         int countReal = (int)outputCount;
         float fractionalCount = outputCount - countReal;
@@ -332,6 +287,9 @@ public abstract class BaseRecipe(
         return countReal;
     }
 
+    /// <summary>
+    /// 用分段算法近似结算二项分布成功次数。
+    /// </summary>
     public static int RollBinomialApprox(ref uint seed, int trials, float probability) {
         if (trials <= 0 || probability <= 0f) {
             return 0;
@@ -373,6 +331,9 @@ public abstract class BaseRecipe(
 
     #region IModCanSave
 
+    /// <summary>
+    /// 从存档读取该分馏域状态。
+    /// </summary>
     public virtual void Import(BinaryReader r) {
         r.ReadBlocks(
             ("OutputMain", br => {
@@ -394,12 +355,13 @@ public abstract class BaseRecipe(
                     if (info != null) info.OutputTotalCount = total;
                     else LogWarning($"Output {id} not found in {TypeName} append outputs");
                 }
-            }),
-            // Legacy: v2.2存档的旧回响等级 → 2.3自动迁移。Export不再写此块，但Import保留以兼容旧存档。
-            ("Meta", br => { RecipeGrowthManager.ImportLegacyState(this, br.ReadInt32()); })
+            })
         );
     }
 
+    /// <summary>
+    /// 将该分馏域状态写入存档。
+    /// </summary>
     public virtual void Export(BinaryWriter w) {
         w.WriteBlocks(
             ("OutputMain", bw => {
@@ -419,6 +381,9 @@ public abstract class BaseRecipe(
         );
     }
 
+    /// <summary>
+    /// 切换或进入其他存档时重置该分馏域状态。
+    /// </summary>
     public virtual void IntoOtherSave() {
         foreach (OutputInfo info in OutputMain) {
             info.OutputTotalCount = 0;

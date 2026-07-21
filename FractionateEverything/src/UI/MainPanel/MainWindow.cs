@@ -1,16 +1,17 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using BepInEx.Configuration;
 using CommonAPI.Systems;
 using FE.UI.MainPanel.Archive;
+using FE.UI.MainPanel.Civilization;
 using FE.UI.MainPanel.CoreOperate;
-using FE.UI.MainPanel.DrawGrowth;
 using FE.UI.MainPanel.ProgressTask;
 using FE.UI.MainPanel.ResourceInteraction;
 using FE.UI.MainPanel.Setting;
 using FE.UI.MainPanel.Shell.Analysis;
 using FE.UI.MainPanel.Shell.MessageBox;
 using FE.UI.MainPanel.Theme;
+using FE.Logic.Progression;
 using UnityEngine;
 using static FE.Utils.Utils;
 using static FE.UI.Foundation.RectTransformUtils;
@@ -29,7 +30,6 @@ public static class MainWindow {
     private static MessageBoxMainPanelWindow _legacyConfigWin;
     private static bool _analysisMainWindowInitialized;
     private static AnalysisMainPanelWindow _analysisMainWindow;
-    private static readonly IFEMainPanelSharedState defaultSharedPanelState = new FEMainPanelSharedState();
     private static bool sandboxMode = false;
     private static bool legacyPageCategoriesInitialized;
     private static bool legacyPageCategoriesSandboxMode;
@@ -38,7 +38,6 @@ public static class MainWindow {
 
     public static FEMainPanelType SelectedMainPanelType { get; private set; } = FEMainPanelType.Analysis;
     public static FEMainPanelType OpenedMainPanelType { get; private set; } = FEMainPanelType.None;
-    public static IFEMainPanelSharedState SharedPanelState { get; private set; } = defaultSharedPanelState;
     private static string currentPageCategoryName;
     private static string currentPageSubpageName;
 
@@ -52,62 +51,36 @@ public static class MainWindow {
         Register("生产管理", "Production Management");
         FracRecipeOperate.AddTranslations();
         VanillaRecipeOperate.AddTranslations();
-        BuildingOperate.AddTranslations();
+        CivilizationOverviewPage.AddTranslations();
+        ProtocolRecoveryPage.AddTranslations();
+        AncientTechTreePage.AddTranslations();
+        CivilizationAchievementPage.AddTranslations();
         Register("资源管理", "Resource Management");
         ItemInteraction.AddTranslations();
-        ResourceOverview.AddTranslations();
-        MarketBoard.AddTranslations();
-        Exchange.AddTranslations();
-        FragmentExchange.AddTranslations();
-        Register("抽取成长", "Draw & Growth");
-        Register("前往商店", "Go to Store");
-        Register("前往抽奖", "Go to Raffle");
-        TicketRaffle.AddTranslations();
-        LimitedTimeStore.AddTranslations();
-        TicketExchange.AddTranslations();
-        Register("任务成就", "Tasks & Achievements");
-        DarkFogTasks.LoadConfig(null); // 存根
-        MainTask.AddTranslations();
-        RecurringTask.AddTranslations();
-        Achievements.AddTranslations();
+        Register("恢复指引", "Recovery Guide");
+        RecoveryGuide.AddTranslations();
         DevelopmentDiary.AddTranslations();
         Register("图鉴档案", "Gallery & Archive");
         RecipeGallery.AddTranslations();
-        FracStatistic.AddTranslations();
         Register("系统设置", "System Setting");
         Miscellaneous.AddTranslations();
-        SandboxMode.AddTranslations();
-        DashboardPage.AddTranslations();
-        AutoReplenishPage.AddTranslations();
     }
 
     public static void LoadConfig(ConfigFile configFile) {
         FracRecipeOperate.LoadConfig(configFile);
         VanillaRecipeOperate.LoadConfig(configFile);
-        BuildingOperate.LoadConfig(configFile);
+        CivilizationOverviewPage.LoadConfig(configFile);
+        ProtocolRecoveryPage.LoadConfig(configFile);
+        AncientTechTreePage.LoadConfig(configFile);
+        CivilizationAchievementPage.LoadConfig(configFile);
 
         ItemInteraction.LoadConfig(configFile);
-        ResourceOverview.LoadConfig(configFile);
-        MarketBoard.LoadConfig(configFile);
-        Exchange.LoadConfig(configFile);
-        FragmentExchange.LoadConfig(configFile);
-
-        TicketRaffle.LoadConfig(configFile);
-        LimitedTimeStore.LoadConfig(configFile);
-        TicketExchange.LoadConfig(configFile);
-
-        MainTask.LoadConfig(configFile);
-        RecurringTask.LoadConfig(configFile);
-        DarkFogTasks.LoadConfig(configFile);
-        Achievements.LoadConfig(configFile);
+        RecoveryGuide.LoadConfig(configFile);
         DevelopmentDiary.LoadConfig(configFile);
 
         RecipeGallery.LoadConfig(configFile);
-        FracStatistic.LoadConfig(configFile);
 
         Miscellaneous.LoadConfig(configFile);
-        SandboxMode.LoadConfig(configFile);
-        DashboardPage.LoadConfig(configFile);
     }
 
     public static void Init() {
@@ -178,12 +151,9 @@ public static class MainWindow {
             return;
         }
 
-        if (!GameMain.history.TechUnlocked(TFE分馏数据中心)) {
+        if (!CivilizationRecoveryManager.HasDataCenterCommunication) {
             return;
         }
-
-        RecurringTask.TickAutoClaim();
-        Achievements.TickAutoUnlock();
 
         if (_toggleKey.keyValue) {
             if (OpenedMainPanelType == FEMainPanelType.None) {
@@ -203,10 +173,6 @@ public static class MainWindow {
         return OpenedMainPanelType != FEMainPanelType.None
             ? OpenedMainPanelType
             : NormalizeMainPanelSelection(SelectedMainPanelType);
-    }
-
-    public static void BindSharedPanelState(IFEMainPanelSharedState sharedState) {
-        SharedPanelState = sharedState ?? defaultSharedPanelState;
     }
 
     public static void SelectMainPanel(FEMainPanelType panelType) {
@@ -284,9 +250,6 @@ public static class MainWindow {
 
         ApplyCurrentPageRouteToOpenedPanel();
 
-        if (OpenedMainPanelType != FEMainPanelType.None) {
-            Achievements.NotifyMainPanelOpened();
-        }
     }
 
     private static bool IsMainPanelImplemented(FEMainPanelType panelType) {
@@ -399,22 +362,11 @@ public static class MainWindow {
         w.Write((int)NormalizeMainPanelSelection(SelectedMainPanelType));
     }
 
-    private static void ResetSharedPanelState() {
-        if (SharedPanelState == null) {
-            return;
-        }
-
-        SharedPanelState.TicketRaffleTotalDraws = 0;
-        SharedPanelState.TicketRaffleOpeningLineDraws = 0;
-        SharedPanelState.AchievementsCurrentPage = 0;
-    }
-
     private static void IntoOtherSaveMainPanelSelection() {
         SelectedMainPanelType = FEMainPanelType.Analysis;
         OpenedMainPanelType = FEMainPanelType.None;
         currentPageCategoryName = null;
         currentPageSubpageName = null;
-        ResetSharedPanelState();
     }
 
     private static void RefreshAnalysisPageCategories() {
@@ -505,19 +457,11 @@ public static class MainWindow {
             (MainPanelSelectionBlockTag, ImportMainPanelSelection),
             ("FracRecipeOperate", FracRecipeOperate.Import),
             ("VanillaRecipeOperate", VanillaRecipeOperate.Import),
-            ("BuildingOperate", BuildingOperate.Import),
             ("ItemInteraction", ItemInteraction.Import),
-            ("TicketRaffle", TicketRaffle.Import),
-            ("LimitedTimeStore", LimitedTimeStore.Import),
-            ("TicketExchange", TicketExchange.Import),
-            ("MainTask", MainTask.Import),
-            ("RecurringTask", RecurringTask.Import),
-            ("Achievements", Achievements.Import),
+            ("RecoveryGuide", RecoveryGuide.Import),
             ("DevelopmentDiary", DevelopmentDiary.Import),
             ("RecipeGallery", RecipeGallery.Import),
-            ("FracStatistic", FracStatistic.Import),
-            ("Miscellaneous", Miscellaneous.Import),
-            ("SandboxMode", SandboxMode.Import)
+            ("Miscellaneous", Miscellaneous.Import)
         );
     }
 
@@ -526,19 +470,11 @@ public static class MainWindow {
             (MainPanelSelectionBlockTag, ExportMainPanelSelection),
             ("FracRecipeOperate", FracRecipeOperate.Export),
             ("VanillaRecipeOperate", VanillaRecipeOperate.Export),
-            ("BuildingOperate", BuildingOperate.Export),
             ("ItemInteraction", ItemInteraction.Export),
-            ("TicketRaffle", TicketRaffle.Export),
-            ("LimitedTimeStore", LimitedTimeStore.Export),
-            ("TicketExchange", TicketExchange.Export),
-            ("MainTask", MainTask.Export),
-            ("RecurringTask", RecurringTask.Export),
-            ("Achievements", Achievements.Export),
+            ("RecoveryGuide", RecoveryGuide.Export),
             ("DevelopmentDiary", DevelopmentDiary.Export),
             ("RecipeGallery", RecipeGallery.Export),
-            ("FracStatistic", FracStatistic.Export),
-            ("Miscellaneous", Miscellaneous.Export),
-            ("SandboxMode", SandboxMode.Export)
+            ("Miscellaneous", Miscellaneous.Export)
         );
     }
 
@@ -546,24 +482,15 @@ public static class MainWindow {
         IntoOtherSaveMainPanelSelection();
         FracRecipeOperate.IntoOtherSave();
         VanillaRecipeOperate.IntoOtherSave();
-        BuildingOperate.IntoOtherSave();
 
         ItemInteraction.IntoOtherSave();
 
-        TicketRaffle.IntoOtherSave();
-        LimitedTimeStore.IntoOtherSave();
-        TicketExchange.IntoOtherSave();
-
-        MainTask.IntoOtherSave();
-        RecurringTask.IntoOtherSave();
-        Achievements.IntoOtherSave();
+        RecoveryGuide.IntoOtherSave();
         DevelopmentDiary.IntoOtherSave();
 
         RecipeGallery.IntoOtherSave();
-        FracStatistic.IntoOtherSave();
 
         Miscellaneous.IntoOtherSave();
-        SandboxMode.IntoOtherSave();
     }
 
     #endregion

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using FE.Compatibility.Nebula;
-using FE.Logic.Progression;
+using FE.Logic.Fractionation.Fractionators;
 using FE.UI.MainPanel.Setting;
 using NebulaAPI;
 using static FE.Utils.Utils;
@@ -13,21 +13,10 @@ namespace FE.Logic.DataCenter;
 /// 分馏数据中心库存、手动上传/提取统计，以及对应存档。
 /// </summary>
 public static class DataCenterInventory {
-    // 加成记录（供交易所 UI 显示）
-    public struct BonusRecord {
-        public int ItemId;
-        public int BonusCount;
-        public bool IsCrit;
-        public string Source; // "random"=随机波动, "exchange"=交易所意外收获
-    }
-    public static readonly List<BonusRecord> RecentBonuses = new();
-    private const int MAX_BONUS_RECORDS = 100;
-    public static void AddBonusRecord(int itemId, int count, bool isCrit, string source) {
-        if (count <= 0) return;
-        RecentBonuses.Add(new BonusRecord { ItemId = itemId, BonusCount = count, IsCrit = isCrit, Source = source });
-        while (RecentBonuses.Count > MAX_BONUS_RECORDS)
-            RecentBonuses.RemoveAt(0);
-    }
+    private const int MaxIntTakeCountByInc = int.MaxValue / 10;
+    private const long MaxLongTakeCountByInc = long.MaxValue / 10L;
+    private const long FractionatorSacrificeThreshold = 1000L;
+
     public static readonly long[] centerItemCount = new long[12000];
     public static readonly long[] centerItemInc = new long[12000];
     public static int leftInc = 0;
@@ -149,102 +138,51 @@ public static class DataCenterInventory {
         return true;
     }
 
-    public static void AddItemToModData(int itemId, int count, int inc = 0, bool manual = false, bool skipMultiplier = false)
-    {
-        bool flag = itemId == 1099;
-        if (flag)
-        {
-            GameMain.mainPlayer.sandCount += (long)count;
+    public static int GetEssenceMinCount() => GetFragmentMinCount();
+
+    public static bool TakeEssenceFromModData(int n, int[] consumeRegister) =>
+        TakeFragmentsFromModData(n, consumeRegister);
+
+    public static void AddItemToModData(int itemId, int count, int inc = 0, bool manual = false) {
+        AddItemToModDataInternal(itemId, count, inc);
+        if (NebulaModAPI.IsMultiplayerActive && manual) {
+            NebulaModAPI.MultiplayerSession.Network.SendPacket(new CenterItemChangePacket(itemId, count, inc));
         }
-        else
-        {
-            bool flag2 = itemId <= 0 || itemId >= 12000;
-            if (!flag2)
-            {
-                long[] obj = DataCenterInventory.centerItemCount;
-                lock (obj)
-                {
-                    long[] array = DataCenterInventory.centerItemCount;
-                    long num = array[itemId];
-                    long num4;
-                    bool flag4 = false;
-                    if (!skipMultiplier)
-                    {
-                        long num3;
-                        // 按当前库存量级决定倍率
-                        if (num < 100L)
-                        {
-                            num3 = 200L;
-                        }
-                        else if (num < 1000L)
-                        {
-                            num3 = 150L;
-                        }
-                        else
-                        {
-                            num3 = 100L;
-                        }
-                        int min;
-                        if ((min = count * 3 / 10) < 1)
-                        {
-                            min = 1;
-                        }
-                        num4 = (long)GetRandInt(min, count * 2);
-                        if (num4 < (long)(count / 3 * 2))
-                        {
-                            num4 += (long)(count / 5);
-                        }
-                        flag4 = GetRandInt(1, 100) <= 8;
-                        if (flag4)
-                        {
-                            int randInt = GetRandInt(1, 100);
-                            if (randInt > 50)
-                            {
-                                if (randInt > 80)
-                                {
-                                    if (randInt > 95)
-                                    {
-                                        num4 *= 10L;
-                                    }
-                                    else
-                                    {
-                                        num4 *= 5L;
-                                    }
-                                }
-                                else
-                                {
-                                    num4 *= 3L;
-                                }
-                            }
-                            else
-                            {
-                                num4 *= 2L;
-                            }
-                        }
-                        num4 = num4 * num3 / 100L;
-                        long bonusAmount = num4 - count;
-                        if (bonusAmount > 0)
-                            AddBonusRecord(itemId, (int)Math.Min(bonusAmount, int.MaxValue), flag4, "random");
-                    }
-                    else
-                    {
-                        num4 = count;
-                    }
-                    array[itemId] = num + num4;
-                    DataCenterInventory.centerItemInc[itemId] += (long)inc;
-                    bool flag5 = itemId >= 8021 && itemId <= 8025;
-                    if (flag5)
-                    {
-                        TechManager.CheckTechUnlockCondition(itemId);
-                    }
-                }
-                bool flag6 = NebulaModAPI.IsMultiplayerActive && manual;
-                if (flag6)
-                {
-                    NebulaModAPI.MultiplayerSession.Network.SendPacket<CenterItemChangePacket>(new CenterItemChangePacket(itemId, count, inc));
-                }
-            }
+    }
+
+    public static void AddItemToModData(int itemId, long count, long inc = 0, bool manual = false) {
+        AddItemToModDataInternal(itemId, count, inc);
+        if (NebulaModAPI.IsMultiplayerActive && manual) {
+            NebulaModAPI.MultiplayerSession.Network.SendPacket(new CenterItemChangeLongPacket(itemId, count, inc));
         }
+    }
+
+    private static void AddItemToModDataInternal(int itemId, long count, long inc = 0) {
+        if (itemId == I沙土) {
+            GameMain.mainPlayer.sandCount += count;
+            return;
+        }
+        if (itemId <= 0 || itemId >= 12000) {
+            return;
+        }
+        lock (centerItemCount) {
+            centerItemCount[itemId] += count;
+            centerItemInc[itemId] += inc;
+        }
+    }
+
+    public static long Take10PercentTower(int itemId) {
+        if (itemId <= 0 || itemId >= 12000 || !FractionatorTowerCatalog.IsActiveFractionator(itemId)) {
+            return 0L;
+        }
+        long count;
+        lock (centerItemCount) {
+            count = centerItemCount[itemId];
+        }
+        if (count < FractionatorSacrificeThreshold) {
+            return 0L;
+        }
+        return TakeItemFromModData(itemId, count / 10, out _);
     }
 
     public static long GetModDataItemCount(int itemId) {
@@ -267,54 +205,64 @@ public static class DataCenterInventory {
     }
 
     public static int TakeItemFromModData(int itemId, int count, out int inc, bool manual = false) {
+        long cappedCount = Math.Min(count, MaxIntTakeCountByInc);
+        long takeCount = TakeItemFromModDataInternal(itemId, cappedCount, out long takeInc);
+        inc = (int)takeInc;
+        if (NebulaModAPI.IsMultiplayerActive && manual && takeCount > 0) {
+            NebulaModAPI.MultiplayerSession.Network.SendPacket(
+                new CenterItemChangePacket(itemId, -(int)takeCount, -inc));
+        }
+        return (int)takeCount;
+    }
+
+    public static long TakeItemFromModData(int itemId, long count, out long inc, bool manual = false) {
+        long cappedCount = Math.Min(count, MaxLongTakeCountByInc);
+        long takeCount = TakeItemFromModDataInternal(itemId, cappedCount, out inc);
+        if (NebulaModAPI.IsMultiplayerActive && manual && takeCount > 0) {
+            NebulaModAPI.MultiplayerSession.Network.SendPacket(new CenterItemChangeLongPacket(itemId, -takeCount, -inc));
+        }
+        return takeCount;
+    }
+
+    private static long TakeItemFromModDataInternal(int itemId, long count, out long inc) {
+        inc = 0;
+        if (count <= 0) {
+            return 0;
+        }
         if (itemId == I沙土) {
-            inc = 0;
             if (GameMain.mainPlayer.sandCount >= count) {
                 GameMain.mainPlayer.sandCount -= count;
                 return count;
             } else {
-                count = (int)GameMain.mainPlayer.sandCount;
+                count = GameMain.mainPlayer.sandCount;
                 GameMain.mainPlayer.sandCount = 0;
                 return count;
             }
         }
         if (itemId <= 0 || itemId >= 12000) {
-            inc = 0;
             return 0;
         }
         lock (centerItemCount) {
-            count = (int)Math.Min(count, centerItemCount[itemId]);
-            count = Math.Min(100000, count);
+            count = Math.Min(count, centerItemCount[itemId]);
             if (count <= 0) {
-                inc = 0;
                 return 0;
             }
             if (centerItemInc[itemId] / centerItemCount[itemId] >= 4) {
-                inc = (int)split_inc(ref centerItemCount[itemId], ref centerItemInc[itemId], count);
+                inc = split_inc(ref centerItemCount[itemId], ref centerItemInc[itemId], count);
             } else {
-                if (centerItemInc[itemId] >= count * 4) {
+                long expectedInc = count * 4;
+                if (centerItemInc[itemId] >= expectedInc) {
                     centerItemCount[itemId] -= count;
-                    inc = count * 4;
+                    inc = expectedInc;
                     centerItemInc[itemId] -= inc;
                 } else {
                     centerItemCount[itemId] -= count;
-                    inc = (int)centerItemInc[itemId];
+                    inc = centerItemInc[itemId];
                     centerItemInc[itemId] = 0;
                 }
-            }
-            if (NebulaModAPI.IsMultiplayerActive && manual) {
-                NebulaModAPI.MultiplayerSession.Network.SendPacket(new CenterItemChangePacket(itemId, -count, -inc));
             }
             return count;
         }
     }
 
-    public static int Take10PercentTower(int itemId) {
-        if (itemId <= 0 || itemId >= 12000) {
-            return 0;
-        }
-        return centerItemCount[itemId] < 1000
-            ? 0
-            : TakeItemFromModData(itemId, (int)Math.Min(int.MaxValue, centerItemCount[itemId] / 10), out _);
-    }
 }

@@ -2,6 +2,7 @@
 using BuildBarTool;
 using CommonAPI.Systems;
 using FE.Compatibility.Mods;
+using FE.Logic.Progression;
 using UnityEngine;
 using static FE.FractionateEverything;
 using static FE.Logic.Fractionation.Fractionators.BuildingGrowthService;
@@ -17,32 +18,71 @@ public static class RectificationTower {
     private static ItemProto item;
     private static RecipeProto recipe;
     private static ModelProto model;
-    public static Color color = new(0.3f, 0.6f, 0.9f);
+    /// <summary>
+    /// 保存该分馏塔原型使用的主题颜色。
+    /// </summary>
+    public static Color color = new(0.18f, 0.46f, 1.0f);
 
+    /// <summary>
+    /// 读取或设置该分馏塔建筑的成长等级。
+    /// </summary>
     public static int Level = 0;
+    /// <summary>
+    /// 判断该建筑是否已启用流动输入增产加成。
+    /// </summary>
     public static bool EnableFluidEnhancement => Level >= LevelThresholdFluidEnhancement;
+    /// <summary>
+    /// 判断精馏塔是否已解锁余辉提取特质。
+    /// </summary>
     public static bool EnableAfterglowExtraction => Level >= LevelThresholdTrait1;
+    /// <summary>
+    /// 判断精馏塔是否已解锁超相压缩特质。
+    /// </summary>
     public static bool EnableHyperphaseCompression => Level >= LevelThresholdTrait2;
-    public static int MaxStack => GetDefaultMaxStackByLevel(Level);
+    /// <summary>
+    /// 读取该建筑当前允许的分馏处理堆叠上限。
+    /// </summary>
+    public static int MaxStack => StackingManager.GetFractionatorMaxStack();
+    /// <summary>
+    /// 读取该建筑当前能耗倍率。
+    /// </summary>
     public static float EnergyRatio => GetDefaultEnergyRatioByLevel(Level);
+    /// <summary>
+    /// 读取该建筑当前每 tick 工作能耗。
+    /// </summary>
     public static long workEnergyPerTick {
         get => model.prefabDesc.workEnergyPerTick;
         set => model.prefabDesc.workEnergyPerTick = value;
     }
+    /// <summary>
+    /// 读取该建筑当前每 tick 待机能耗。
+    /// </summary>
     public static long idleEnergyPerTick {
         get => model.prefabDesc.idleEnergyPerTick;
         set => model.prefabDesc.idleEnergyPerTick = value;
     }
+    /// <summary>
+    /// 读取该建筑当前增产点倍率。
+    /// </summary>
     public static float PlrRatio => GetDefaultPlrRatioByLevel(Level);
+    /// <summary>
+    /// 保存该分馏塔类型当前获得的全局成功率加成。
+    /// </summary>
     public static float SuccessBoost = 0;
 
+    /// <summary>
+    /// 注册该分馏域对象需要的本地化文本。
+    /// </summary>
     public static void AddTranslations() {
-        Register("精馏塔", "Rectification Tower");
+        Register("精馏塔", "Analysis Tower", "解析塔");
         Register("I精馏塔",
-            "Compress matrices into Fragments. Higher tower levels improve throughput, power efficiency and fragment conversion.",
-            "将矩阵稳定压缩为残片。精馏塔等级越高，吞吐、能耗与残片转化效率越好。");
+            "Converts matrices into physical analysis data used to recover ancient-civilization protocols.",
+            "将矩阵转化为实体解析数据，用于恢复远古文明协议。");
     }
 
+    /// <summary>
+    /// 创建并注册该分馏塔的物品、配方和模型原型。
+    /// </summary>
     public static void Create() {
         item = ProtoRegistry.RegisterItem(IFE精馏塔, "精馏塔", "I精馏塔",
             "Assets/fe/deconstruction-tower", tab分馏 * 1000 + 305, 30, EItemType.Production,
@@ -59,6 +99,9 @@ public static class RectificationTower {
         item.SetBuildBar(OrbitalRing.Enable ? 6 : 5, item.GridIndex % 10, true);
     }
 
+    /// <summary>
+    /// 应用该分馏塔的模型材质和颜色配置。
+    /// </summary>
     public static void SetMaterial() {
         Material m_main = new(model.prefabDesc.lodMaterials[0][0]) { color = color };
         Material m_black = model.prefabDesc.lodMaterials[0][1];
@@ -75,6 +118,9 @@ public static class RectificationTower {
         ];
     }
 
+    /// <summary>
+    /// 按当前等级刷新该分馏塔原型的生命值和能耗。
+    /// </summary>
     public static void UpdateHpAndEnergy() {
         if (DSPGame.IsMenuDemo || GameMain.mainPlayer == null) {
             return;
@@ -87,6 +133,9 @@ public static class RectificationTower {
 
     #region IModCanSave
 
+    /// <summary>
+    /// 从存档读取该分馏域状态。
+    /// </summary>
     public static void Import(BinaryReader r) {
         r.ReadBlocks(
             ("Level", br => { Level = Mathf.Max(0, Mathf.Min(MaxLevel, br.ReadInt32())); })
@@ -94,12 +143,18 @@ public static class RectificationTower {
         UpdateHpAndEnergy();
     }
 
+    /// <summary>
+    /// 将该分馏域状态写入存档。
+    /// </summary>
     public static void Export(BinaryWriter w) {
         w.WriteBlocks(
             ("Level", bw => bw.Write(Level))
         );
     }
 
+    /// <summary>
+    /// 切换或进入其他存档时重置该分馏域状态。
+    /// </summary>
     public static void IntoOtherSave() {
         Level = 0;
         UpdateHpAndEnergy();

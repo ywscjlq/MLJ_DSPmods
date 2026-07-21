@@ -6,12 +6,12 @@
 
 # 万物分馏 Fractionate Everything
 
-不同功能的分馏塔、大量独特的分馏配方，还有全新的总控面板可以抽取、升级相关配方和建筑！
+四类功能不同的分馏塔、大量单输入概率配方，以及围绕远古文明协议恢复建立的总控面板。
 
 **_尽情享受分馏的乐趣吧！_**
 
-Different functioning fractionators, tons of unique fractionation recipes, and a brand new master control panel to
-extract and upgrade related recipes and buildings!
+Four specialized fractionators, many single-input probabilistic recipes, and a control panel built around recovering
+ancient-civilization protocols.
 
 **_Have fun with fractionation!_**
 
@@ -23,100 +23,59 @@ extract and upgrade related recipes and buildings!
 
 万物分馏添加了全新的建筑，它们的效果非常强大！
 
-* 交互塔：将分馏塔原胚培养为不同的分馏塔。除此之外，当交互塔的正面输入并且两侧无连接时，输入的物品会上传至分馏数据中心。
-* 矿物复制塔：复制各种矿物，包括黑雾特有掉落。需要在分馏数据中心解锁并升级对应配方。
-* 点数聚集塔：将增产点数集中到部分物品上，从而产出携带更多的增产点数的物品。需要在分馏数据中心升级点数聚集效率层次。
-* 量子复制塔：利用分馏精华卓越的可塑性复制各种物品。增产点数可以减少分馏精华的消耗。运行时会自动从分馏数据中心扣除四种分馏精华。需要在分馏数据中心解锁并升级对应配方。
-* 转化塔：将物品转化为与其相关的其他物品。需要在分馏数据中心解锁并升级对应配方。
+* 交互塔：培养分馏塔原胚；正面输入且两侧无连接时，将物品上传至分馏数据中心。
+* 资源塔：复制可持续消耗的原矿资源，包括满足接触条件的黑雾掉落；对应协议完整度达到 100 后才可运行。
+* 转化塔：在同一工业链或用途链内转换物品；对应协议完整度达到 100 后才可运行。
+* 解析塔：将矩阵处理为实体解析数据，上传后为对应文明阶段生成协议检索机会。
 * 物流交互站：可以与分馏数据中心进行物品交互的行星内物流运输站。
 
 Fractionate Everything has added brand new buildings which are very powerful in their effects!
 
-* Interaction Tower: Cultivates the fractionator proto-germ into a different fractionator. In addition to this, when the
-  front of the Interaction Tower is input and there are no connections on either side, the input items will be uploaded
-  to the Fractionation Data Center.
-* Mineral Duplication Tower: Duplicates various minerals, including Black Mist-specific drops. There is a certain
-  probability of getting a replication essence. You need to unlock and upgrade the corresponding recipe in the
-  Fractionation Data Center.
-* Point Aggregation Tower: Concentrate production increase points on some items, thus producing items with more
-  production increase points. Requires upgrading the Point Aggregation Efficiency Level in the Fractionation Data
-  Center.
-* Quantum Replication Tower: Utilizes the superior malleability of Fractionation Essence to replicate various items.
-  Increased production points reduce the consumption of Fractionation Essence. Four types of Fractionated Essence are
-  automatically deducted from the Fractionation Data Center when running. You need to unlock and upgrade the
-  corresponding recipe in the Fractionation Data Center.
-* Conversion Tower: Convert items into other items related to them. There is a certain probability of obtaining
-  Transformation Essence. You need to unlock and upgrade the corresponding recipe in the Fractionation Data Center.
+* Interaction Tower: Cultivates fractionator embryos and uploads front-input items to the Data Center when neither side
+  is connected.
+* Resource Tower: Replicates consumable raw resources, including eligible dark-fog drops. A managed recipe becomes
+  usable only after its protocol reaches 100 completeness.
+* Conversion Tower: Converts items within the same production or use chain. A managed recipe becomes usable only after
+  its protocol reaches 100 completeness.
+* Analysis Tower: Processes matrices into physical analysis data; uploading that data generates retrieval opportunities
+  for the matching civilization stage.
 * Logistics Interaction Station: An intra-planetary logistics station that can interact with the Fractionation Data
   Center.
 
-### 抽奖系统 Raffle System
+### 文明恢复与协议 Civilization Recovery Protocols
 
-抽奖是很重要的一环。快来试试你的手气吧！
+万物分馏能力不再作为主脑科技树里的普通研究项。玩家通过解析塔生产实体解析数据，再将数据上传到分馏数据中心，逐步生成越来越昂贵的检索机会。
 
-* 配方奖池：可以抽取各种分馏配方。
-* 原胚奖池：可以抽取各种分馏塔原胚。
-* 材料奖池：可以抽取各种已解锁的材料。
-* 建筑奖池：可以抽取各种已解锁的建筑。
+每次检索可能没有响应、发现一项新协议，或推进一项已发现协议。已发现协议可设置优先目标；连续失败和连续未发现都有保底。随机性只改变恢复顺序和速度，协议最终都能取得。完整度达到 100 后，对应资源复制或转化配方才可运行；没有协议的阶段会直接进入深层解析，不会卡住已有检索机会。
 
-Raffles are an important part of the process. Come and try your luck!
+Fractionate Everything abilities are no longer ordinary core-game research. Analysis Towers produce physical analysis
+data, and uploading it to the Data Center generates progressively more expensive retrieval opportunities.
 
-* Recipe Prize Pool: You can draw all kinds of Fractionation Recipes, and if you are lucky, you can also get the
-  Fractionation Recipe Universal Core.
-* Original embryo prize pool: you can extract a variety of fractionator embryo, good luck can also get the fractionator
-  increase chip.
-* Material Pool: You can extract various unlocked materials.
-* Building Pool: You can draw various unlocked buildings.
+A retrieval may fail, discover a protocol, or advance a discovered one. Discovered protocols can be prioritized, while
+failure and discovery pity prevent permanent stalls. Randomness changes order and pacing only. A managed recipe becomes
+usable at 100 completeness; stages with no protocols proceed directly to deep analysis.
 
-### 配方升级与突破、建筑升级与强化 Recipe upgrades and breakthroughs, building upgrades and enhancements
+### 远古科技树 Ancient Technology Tree
 
-无论是配方还是建筑，都需要不断升级，才能达到最强力的状态！
+阶段内协议全部完成后，后续检索转为深层解析，并稳定产出唯一一种远古文明科技点。科技树包含交互塔、资源塔、转化塔、解析塔四条并列纵向主干；每条主干按以下顺序推进：
 
-* 配方升级：使用指定配方分馏即可持续获得经验，经验达标后可自动升级！
-* 配方突破：配方品质有白、绿、蓝、紫、红、金，达到一定等级，收集足够数目的回响，即可突破到新的品质！
-* 建筑升级：建筑有很多实用的升级项，例如流动输出堆叠、产物输出堆叠，可以摆脱集装的烦恼！
-* 建筑强化：建筑完全升级后，即可逐步强化至+20，加快速率，提升产能！
+`流动输出堆叠 → 产物输出堆叠 → 分馏永动 → 主路锁定 → 副产物弃置`
 
-Both recipes and buildings need to be constantly upgraded to reach their most powerful state!
+节点有真实前置关系和递增价格，同类所有实体塔共享解锁状态。当前前三项已接入运行逻辑；后两项会显示为尚未接入且不可购买，不会用文字伪装成已经生效。
 
-* Recipe upgrading: using the specified recipe fractionation can be continuously gained experience, experience can be
-  automatically upgraded after reaching the standard!
-* Recipe Breakthrough: Recipe qualities are white, green, blue, purple, red, and gold, reaching a certain level and
-  collecting a sufficient number of echoes can break through to a new quality!
-* Building Upgrade: There are many practical upgrades for buildings, such as flow output stacking and product output
-  stacking, which can get rid of the trouble of assembling!
-* Building Enhancement: Once a building is fully upgraded, it can be gradually enhanced to +20 to speed up the rate and
-  increase production capacity!
+After all required protocols in a stage are complete, later retrievals become deep analysis and award the single ancient
+technology point type. The tree has four parallel vertical paths for Interaction, Resource, Conversion, and Analysis
+Towers. Each path advances through fluid-output stacking, product-output stacking, continuous fractionation, main-output
+locking, and byproduct discard. The first three abilities are active; the final two remain visibly unavailable until their
+runtime behavior is implemented.
 
-### 新分馏科技 New Fractionation Technology
+### 文明成就 Civilization Achievements
 
-除了使用矩阵解锁的常规科技，还有一部分科技是通过特殊方式解锁的！
+文明成就是当前存档内的固定里程碑，由协议恢复、阶段完成、科技投入和真实分馏次数自然推进。完成后自动提供固定加成，不消耗科技点，也不使用领取任务、每日奖励或跨存档抽取强度。
 
-将产物上传至分馏数据中心，即可解锁对应科技，得到合成它的配方~
-
-至于怎么做，就需要你在游戏中研究了！
-
-In addition to the regular techs that are unlocked using the Matrix, there are some techs that are unlocked in a special
-way!
-
-By uploading a product to the Fractionation Data Center, you can unlock the corresponding technology and get the recipe
-to synthesize it.
-
-As for how to do it, you need to research it in the game!
-
-### 任务系统、成就系统 Quest System, Achievement System
-
-一个游戏怎么能没有任务系统和成就系统呢？你说是吧！
-
-接取任务并完成，即可获得各种奖励~
-
-完成成就，就会解锁开发日志！等等，你是在这里写小说吗？
-
-How can a game not have a quest system and an achievement system? You think so!
-
-Take a mission and complete it to get various rewards.
-
-Completing achievements will unlock the development log! Wait, are you writing a novel here?
+Civilization achievements are fixed milestones in the current save. Protocol recovery, stage completion, technology
+spending, and real fractionation activity advance them naturally. Their fixed bonuses apply automatically and do not use
+claimable quests, daily rewards, or cross-save draw power.
 
 ## 安装方法 Installation
 

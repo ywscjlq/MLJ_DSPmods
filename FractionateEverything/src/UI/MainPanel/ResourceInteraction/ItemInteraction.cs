@@ -39,10 +39,10 @@ public static class ItemInteraction {
         (EItemType.Matrix, "科学矩阵"),
     ];
     private static readonly int[][] FractionateGroupItemIdGroups = [
-        [IFE交互塔原胚, IFE矿物复制塔原胚, IFE点数聚集塔原胚, IFE转化塔原胚, IFE精馏塔原胚, IFE分馏塔定向原胚],
+        [IFE交互塔原胚, IFE矿物复制塔原胚, IFE转化塔原胚, IFE精馏塔原胚, IFE分馏塔定向原胚],
         [IFE残片],
         [IFE交互塔, IFE行星内物流交互站, IFE星际物流交互站],
-        [IFE矿物复制塔, IFE点数聚集塔, IFE转化塔, IFE精馏塔],
+        [IFE矿物复制塔, IFE转化塔, IFE精馏塔],
         [I电磁矩阵, I能量矩阵, I结构矩阵, I信息矩阵, I引力矩阵, I宇宙矩阵],
         [I能量碎片, I黑雾矩阵, I物质重组器, I硅基神经元, I负熵奇点, I核心素],
     ];
@@ -53,6 +53,7 @@ public static class ItemInteraction {
     private static RectTransform tab;
 
     private static ConfigEntry<bool> ShowNotStoredItemEntry;
+    private static ConfigEntry<int> SelectedFilterMaskEntry;
     private static int SelectedItemID;
     private static int _currentPage;
 
@@ -78,12 +79,17 @@ public static class ItemInteraction {
             "The storage capacity of the following items in the Fractionation data centre are: ");
         Register("提取物品", "Extract Item");
         Register("提取物品说明",
-            "Left-click or right-click to extract items. The number of extraction groups can be adjusted on the settings page.",
-            "左键单击、右键单击均可提取物品，提取组数可以在设置页面调整。");
+            "Left-click or right-click to extract items. The number of extraction groups can be adjusted on the settings page. This page shows the actual extractable data-centre stock.",
+            "左键单击、右键单击均可提取物品，提取组数可以在设置页面调整。本页面显示的是数据中心当前实际可提取库存。");
     }
 
     public static void LoadConfig(ConfigFile configFile) {
         ShowNotStoredItemEntry = configFile.Bind("Item Interaction", "Show Not Stored Item", false, "是否显示未存储的物品。");
+        SelectedFilterMaskEntry = configFile.Bind("Item Interaction", "Selected Filter Mask", 0,
+            "物品交互页面的类型筛选位掩码。");
+        if (SelectedFilterMaskEntry.Value < 0) {
+            SelectedFilterMaskEntry.Value = 0;
+        }
     }
 
     public static void CreateUI(MyWindow wnd, RectTransform trans) {
@@ -168,18 +174,24 @@ public static class ItemInteraction {
             int row = i / FilterColumnCount;
             int col = i % FilterColumnCount;
             int filterIndex = i;
-            nodes.Add(CheckBoxNode(false, ItemTypeFilters[i].labelKey, 14,
+            nodes.Add(CheckBoxNode(IsFilterSelected(filterIndex), ItemTypeFilters[i].labelKey, 14,
                 onBuilt: cb => {
                     _typeFilterChecks[filterIndex] = cb;
-                    cb.OnChecked += () => { _currentPage = 0; };
+                    cb.OnChecked += () => {
+                        SaveSelectedFilterMask();
+                        _currentPage = 0;
+                    };
                 },
                 pos: (row + 1, col), objectName: $"item-interaction-filter-{filterIndex}"));
         }
 
-        nodes.Add(CheckBoxNode(false, "万物分馏", 14,
+        nodes.Add(CheckBoxNode(IsFilterSelected(ItemTypeFilters.Length), "万物分馏", 14,
             onBuilt: cb => {
                 _fractionateGroupCheckBox = cb;
-                cb.OnChecked += () => { _currentPage = 0; };
+                cb.OnChecked += () => {
+                    SaveSelectedFilterMask();
+                    _currentPage = 0;
+                };
             },
             pos: (3, 3), objectName: "item-interaction-filter-fractionate"));
 
@@ -329,6 +341,30 @@ public static class ItemInteraction {
         return false;
     }
 
+    private static bool IsFilterSelected(int index) {
+        int mask = SelectedFilterMaskEntry?.Value ?? 0;
+        return (mask & (1 << index)) != 0;
+    }
+
+    private static void SaveSelectedFilterMask() {
+        if (SelectedFilterMaskEntry == null) {
+            return;
+        }
+
+        int mask = 0;
+        for (int i = 0; i < _typeFilterChecks.Length; i++) {
+            if (_typeFilterChecks[i] != null && _typeFilterChecks[i].Checked) {
+                mask |= 1 << i;
+            }
+        }
+
+        if (_fractionateGroupCheckBox != null && _fractionateGroupCheckBox.Checked) {
+            mask |= 1 << ItemTypeFilters.Length;
+        }
+
+        SelectedFilterMaskEntry.Value = mask;
+    }
+
     private static void ClearAllGroupFilters() {
         for (int i = 0; i < _typeFilterChecks.Length; i++) {
             if (_typeFilterChecks[i] != null) {
@@ -339,6 +375,7 @@ public static class ItemInteraction {
         if (_fractionateGroupCheckBox != null) {
             _fractionateGroupCheckBox.Checked = false;
         }
+        SaveSelectedFilterMask();
         _currentPage = 0;
     }
 

@@ -6,7 +6,6 @@ using System.Text;
 using BepInEx.Configuration;
 using FE.UI.Controls;
 using FE.UI.Foundation.Window;
-using FE.UI.MainPanel.ProgressTask;
 using FE.UI.MainPanel.Theme;
 using UnityEngine;
 using UnityEngine.UI;
@@ -359,7 +358,7 @@ public static class DevelopmentDiary {
             "",
             """
             2024年9月
-            交互塔、复制塔、点数聚集塔……
+            交互塔、复制塔、转化塔、精馏塔……
             分馏塔家族迎来了大爆发。我设计了全新的“物品价值”体系，确保抽奖产出符合能量守恒（大雾）。
             看着各种精华、回响、核心、芯片这些新名词出现在代码里，我感觉自己像是在做一个全新的RPG游戏。
             """);
@@ -647,7 +646,7 @@ public static class DevelopmentDiary {
              我现在的身体、我的传送带、我的每个分馏塔都在冒着诡异的蓝光。
              主脑：【警告，检测到伊卡洛斯表面辐射超标，是否是因为过度使用{"增产剂".WithColor(Blue)}？】
              我：【不，这是“效率的光芒”。】
-             我把几万瓶增产剂往{"点数聚集塔".WithColor(Orange)}里一丢，出来的物品自带 +100% 产出增幅。
+             我把几万瓶增产剂往{"矿物复制塔".WithColor(Orange)}里一丢，出来的物品自带 +100% 产出增幅。
              我现在已经不需要采矿了，我只需要把现有的物资丢进去“刷”一下，它们就自己变多了。
              这哪是戴森球计划啊，这简直是《我与蓝胶不得不说的故事》。
              """);
@@ -973,47 +972,10 @@ public static class DevelopmentDiary {
         return builder.ToString();
     }
 
-    private static bool TryUnlockRandomFragmentInternal() {
-        List<int> availableCategoryIndices = [];
-        for (int categoryIndex = 0; categoryIndex < diaryCategories.Length; categoryIndex++) {
-            if (diaryCategories[categoryIndex].Fragments.Any(fragment => !IsUnlocked(fragment))) {
-                availableCategoryIndices.Add(categoryIndex);
-            }
-        }
-
-        if (availableCategoryIndices.Count == 0) {
-            return false;
-        }
-
-        int selectedCategoryIndex = availableCategoryIndices[GetRandInt(0, availableCategoryIndices.Count)];
-        foreach (DiaryFragment fragment in diaryCategories[selectedCategoryIndex].Fragments
-                     .OrderBy(static item => item.Order)) {
-            if (IsUnlocked(fragment)) {
-                continue;
-            }
-
+    private static void UnlockAllFragments() {
+        foreach (DiaryFragment fragment in diaryFragments) {
             unlockedFragmentIds.Add(fragment.Id);
-            return true;
         }
-
-        return false;
-    }
-
-    private static void SyncUnlockedFragmentsWithAchievements() {
-        int targetUnlockedCount = Math.Min(Achievements.GetClaimedAchievementCount(), diaryFragments.Length);
-        while (unlockedFragmentIds.Count < targetUnlockedCount) {
-            if (!TryUnlockRandomFragmentInternal()) {
-                break;
-            }
-        }
-    }
-
-    public static bool TryUnlockRandomFragmentFromAchievement() {
-        bool changed = TryUnlockRandomFragmentInternal();
-        if (changed) {
-            RefreshEntry();
-        }
-        return changed;
     }
 
     private static RectTransform tab;
@@ -1202,7 +1164,7 @@ public static class DevelopmentDiary {
             })
         );
         ClampSelection();
-        SyncUnlockedFragmentsWithAchievements();
+        UnlockAllFragments();
     }
 
     public static void Export(BinaryWriter w) {
@@ -1228,7 +1190,7 @@ public static class DevelopmentDiary {
 
     public static void IntoOtherSave() {
         ResetState();
-        SyncUnlockedFragmentsWithAchievements();
+        UnlockAllFragments();
     }
 
     #endregion

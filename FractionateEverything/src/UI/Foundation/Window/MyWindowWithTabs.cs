@@ -66,6 +66,8 @@ public class MyWindowWithTabs : MyWindow {
         var btnText = btn.transform.Find("Text").GetComponent<Text>();
         btnText.text = label.Translate();
         btnText.fontSize = 16;
+        // var srcText = UIRoot.instance.uiGame.assemblerWindow.stateText;
+        // btnText.font = srcText.font;
         // btnText.fontStyle = srcText.fontStyle;
         btn.data = index;
 

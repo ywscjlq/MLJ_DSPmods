@@ -54,6 +54,7 @@ public class MyWindow : ManualBehaviour {
     }
 
     public static T Create<T>(string name, string title = "") where T : MyWindow {
+        // var go = Instantiate(_baseObject, UIRoot.instance.uiGame.transform.parent);
         var go = Instantiate(_baseObject, UIRoot.instance.uiGame.inserterWindow.transform.parent);
         go.name = name;
         go.SetActive(false);
@@ -230,6 +231,13 @@ public class MyWindow : ManualBehaviour {
         return cb;
     }
 
+    // public MyCheckBox AddCheckBox(float x, float y, RectTransform parent, bool check, string label = "",
+    //     int fontSize = 15) {
+    //     var cb = MyCheckBox.CreateCheckBox(x, y, parent, check, label, fontSize);
+    //     _maxX = Math.Max(_maxX, x + cb.Width);
+    //     MaxY = Math.Max(MaxY, y + cb.Height);
+    //     return cb;
+    // }
 
     public MyComboBox AddComboBox(float x, float y, RectTransform parent, int fontSize = 15) {
         var comboBox = MyComboBox.CreateComboBox(x, y, parent).WithFontSize(Math.Max(MinFontSize, fontSize));

@@ -207,10 +207,10 @@ public static partial class TechManager {
     /// <returns></returns>
     private static Vector2 GetTechPos(int row, int column) {
         if (GenesisBook.Enable) {
-            return new(1 + column, 0 - row);
+            return new(4 + column * 4, 0 - row * 4);
         }
         if (OrbitalRing.Enable) {
-            return new(1 + column, 0 - row);
+            return new(4 + column * 4, 0 - row * 4);
         }
         return new(4 + column * 4, 0 - row * 4);
     }

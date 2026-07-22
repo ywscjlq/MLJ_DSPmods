@@ -9,9 +9,13 @@ public static class RecipeModifierCache {
     private static readonly Dictionary<ERecipe, float> successRateBonusByType = [];
     private static float allRecipeSuccessRateBonus;
 
+    /// <summary>活跃遗物带来的副产物条目（物品ID → 概率）</summary>
+    private static readonly Dictionary<int, float> relicByproductEntries = [];
+
     public static void Reset() {
         successRateBonusByType.Clear();
         allRecipeSuccessRateBonus = 0f;
+        relicByproductEntries.Clear();
     }
 
     public static void AddSuccessRateBonus(ERecipe recipeType, float bonus) {
@@ -35,4 +39,14 @@ public static class RecipeModifierCache {
         successRateBonusByType.TryGetValue(recipe.RecipeType, out float typeBonus);
         return allRecipeSuccessRateBonus + typeBonus;
     }
+
+    /// <summary>注册一个遗物副产物产出</summary>
+    public static void AddRelicByproduct(int itemId, float chance) {
+        if (itemId <= 0 || chance <= 0f) return;
+        relicByproductEntries.TryGetValue(itemId, out float current);
+        relicByproductEntries[itemId] = current + chance;
+    }
+
+    /// <summary>获取所有活跃遗物带来的副产物条目（只读）</summary>
+    public static IReadOnlyDictionary<int, float> GetRelicByproducts() => relicByproductEntries;
 }

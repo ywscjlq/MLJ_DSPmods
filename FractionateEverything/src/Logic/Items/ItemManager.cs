@@ -4,6 +4,7 @@ using System.Linq;
 using CommonAPI.Systems;
 using FE.Compatibility.Mods;
 using FE.Logic.Fractionation.Fractionators;
+using FE.Logic.Relic;
 using UnityEngine;
 using static FE.FractionateEverything;
 using static FE.Utils.Utils;
@@ -100,6 +101,14 @@ public static class ItemManager {
         RegisterCivilizationItem(IFE记忆源点, "记忆源点", "I记忆源点", 109,
             new Color(0.45f, 0.75f, 1f), new Color(0.1f, 0.2f, 0.4f), "memory");
 
+        // 遗物副产物物品
+        RegisterRelicByproductItem(RelicItemIds.PlasmaByproduct, "等离子副产物", "高温等离子体萃取的稀有材料", 301,
+            new Color(1f, 0.3f, 0.1f), new Color(0.3f, 0.05f, 0.01f), "plasma-byproduct");
+        RegisterRelicByproductItem(RelicItemIds.EntropyByproduct, "熵晶", "逆熵过程凝聚的有序晶体", 302,
+            new Color(0.1f, 0.7f, 1f), new Color(0.01f, 0.1f, 0.25f), "entropy-byproduct");
+        RegisterRelicByproductItem(RelicItemIds.InfiniteCatalystByproduct, "催化余烬", "催化循环中产生的活性残留物", 303,
+            new Color(1f, 0.85f, 0.3f), new Color(0.3f, 0.2f, 0.05f), "catalyst-byproduct");
+
         RegisterTowerProto(IFE交互塔原胚, "交互塔原胚", "I交互塔原胚", 201,
             "Assets/fe/frac-proto-normal", InteractionTower.color, "interaction-proto");
         RegisterTowerProto(IFE解析塔原胚, "解析塔原胚", "I解析塔原胚", 202,
@@ -123,6 +132,11 @@ public static class ItemManager {
     }
 
     private static void RegisterCivilizationItem(int itemId, string name, string description, int gridOffset,
+        Color iconColor, Color iconBackgroundColor, string iconTag) {
+        RegisterFeInternalItem(itemId, name, description, gridOffset, iconColor, iconBackgroundColor, iconTag);
+    }
+
+    private static void RegisterRelicByproductItem(int itemId, string name, string description, int gridOffset,
         Color iconColor, Color iconBackgroundColor, string iconTag) {
         RegisterFeInternalItem(itemId, name, description, gridOffset, iconColor, iconBackgroundColor, iconTag);
     }
@@ -628,6 +642,10 @@ public static class ItemManager {
         itemValue[IFE引力解析数据] = 32.0f;
         itemValue[IFE宇宙解析数据] = 64.0f;
         itemValue[IFE记忆源点] = 256.0f;
+        // 遗物副产物价值
+        itemValue[RelicItemIds.PlasmaByproduct] = 10.0f;
+        itemValue[RelicItemIds.EntropyByproduct] = 20.0f;
+        itemValue[RelicItemIds.InfiniteCatalystByproduct] = 40.0f;
     }
 
     private static void SetCivilizationResourceMatrixStages() {
@@ -639,6 +657,10 @@ public static class ItemManager {
         itemToMatrix[IFE引力解析数据] = I引力矩阵;
         itemToMatrix[IFE宇宙解析数据] = I宇宙矩阵;
         itemToMatrix[IFE记忆源点] = I引力矩阵;
+        // 遗物副产物映射到对应阶段矩阵
+        itemToMatrix[RelicItemIds.PlasmaByproduct] = I结构矩阵;
+        itemToMatrix[RelicItemIds.EntropyByproduct] = I信息矩阵;
+        itemToMatrix[RelicItemIds.InfiniteCatalystByproduct] = I宇宙矩阵;
     }
 
     public static int GetTechTopMatrixID(TechProto tech) {

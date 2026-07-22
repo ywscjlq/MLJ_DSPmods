@@ -175,6 +175,14 @@ public static class RelicManager {
         // 遗物提供的 SpeedMultiplier 和 SuccessBonus 统一映射为全局成功率加成
         RecipeModifierCache.AddAllRecipeSuccessRateBonus(suc);
         LogInfo($"[Relic] 全局加成已更新: 成功率+{suc * 100:F0}% (来自{_discoveredIds.Count}/{_templates.Count}个遗物)");
+
+        // 注册遗物副产物产出
+        foreach (int tid in _discoveredIds) {
+            if (_templates.TryGetValue(tid, out var tpl) && tpl.ByproductChance > 0f && tpl.ByproductItemId > 0) {
+                RecipeModifierCache.AddRelicByproduct(tpl.ByproductItemId, tpl.ByproductChance);
+                LogInfo($"[Relic] 副产物注册: ID={tpl.ByproductItemId} 概率={tpl.ByproductChance:F2} (来自{tpl.Name})");
+            }
+        }
     }
 
     /// <summary>初始化/加载存档后调用，恢复遗物加成到RecipeModifierCache</summary>

@@ -445,6 +445,26 @@ public static partial class ProcessManager {
                             AddItemToModData(IFE残片, fragmentCount);
                         }
                     }
+                    // 遗物副产物产出：每个成功分馏独立掷骰
+                    if (batchResult.SuccessCount > 0) {
+                        var relicByproducts = RecipeModifierCache.GetRelicByproducts();
+                        if (relicByproducts.Count > 0) {
+                            var rng = new System.Random((int)(__instance.seed + GameMain.gameTick + 777));
+                            foreach (var kvp in relicByproducts) {
+                                int itemId = kvp.Key;
+                                float chance = kvp.Value;
+                                int count = 0;
+                                for (int i = 0; i < batchResult.SuccessCount; i++) {
+                                    if (rng.NextDouble() < chance) {
+                                        count++;
+                                    }
+                                }
+                                if (count > 0) {
+                                    AddItemToModData(itemId, count);
+                                }
+                            }
+                        }
+                    }
                 }
 
                 recipe?.RecordSuccesses(batchResult.SuccessCount);

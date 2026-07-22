@@ -459,7 +459,11 @@ public static class ProtocolRetrievalService {
             progress.Discovered = true;
             progress.Completeness = Math.Min(100, random.Next(20, 41));
             stageProgress.DiscoveryStreak = 0;
-            return new(progress.Completeness >= 100 ? ProtocolRetrievalOutcome.Completed : ProtocolRetrievalOutcome.Discovered,
+            bool completed = progress.Completeness >= 100;
+            if (completed) {
+                AddItemToModData(IFE记忆源点, 2);
+            }
+            return new(completed ? ProtocolRetrievalOutcome.Completed : ProtocolRetrievalOutcome.Discovered,
                 definition.RecipeKey, previous, progress.Completeness, false, spentFragments, spentMemorySourcePoints, 0);
         }
 
@@ -471,6 +475,9 @@ public static class ProtocolRetrievalService {
         ProtocolRetrievalOutcome outcome = targetProgress.Completeness >= 100
             ? ProtocolRetrievalOutcome.Completed
             : ProtocolRetrievalOutcome.Progressed;
+        if (targetProgress.Completeness >= 100) {
+            AddItemToModData(IFE记忆源点, 2);
+        }
         return new(outcome, target.RecipeKey, oldCompleteness, targetProgress.Completeness, false,
             spentFragments, spentMemorySourcePoints, 0);
     }

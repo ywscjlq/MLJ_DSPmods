@@ -478,9 +478,10 @@ public static class ProtocolRetrievalService {
             : ProtocolRetrievalOutcome.Progressed;
         if (targetProgress.Completeness >= 100) {
             AddItemToModData(IFE记忆源点, 2);
-            // 30%概率免费发掘一个遗物
+            // 30%概率免费发掘一个遗物（仅限当前已解锁世代）
             if (new System.Random().NextDouble() < 0.3) {
-                RelicManager.TryFreeExcavation(new System.Random());
+                int completedStages = ProtocolCatalog.GetCompletedStageCount();
+                RelicManager.TryFreeExcavation(new System.Random(), completedStages);
             }
         }
         return new(outcome, target.RecipeKey, oldCompleteness, targetProgress.Completeness, false,

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using FE.Logic.Civilization.Protocols;
 using FE.Logic.Relic;
 using FE.UI.Foundation.Window;
 using UnityEngine;
@@ -113,12 +114,23 @@ public static class RelicPage {
                     (owned ? "<color=#4CAF50>已收集</color>" : "<color=#FF5722>未收集</color>"));
 
                 if (!owned) {
-                    if (GUI.Button(new Rect(listX + listW - 150, actionY, 140, 30), "🔍 发掘")) {
-                        if (RelicManager.Excavate(selectedRelic)) {
+                    RelicEra maxEra = RelicManager.MaxEraForProtocols(ProtocolCatalog.GetCompletedStageCount());
+                    bool eraLocked = (int)tpl.Era > (int)maxEra;
+                    if (eraLocked) {
+                        int needProtocols = tpl.Era switch {
+                            RelicEra.Ancient => 2,
+                            RelicEra.Classical => 5,
+                            RelicEra.Golden => 10,
+                            _ => 0
+                        };
+                        GUI.Label(new Rect(listX + listW - 150, actionY, 140, 20),
+                            $"🔒 需完成 {needProtocols} 个协议");
+                    } else if (GUI.Button(new Rect(listX + listW - 150, actionY, 140, 30), "🔍 发掘")) {
+                        if (RelicManager.Excavate(selectedRelic, ProtocolCatalog.GetCompletedStageCount())) {
                             statusText = $"✅ 发掘成功: {tpl.Name}!";
                             statusTimer = 3f;
                         } else {
-                            statusText = "❌ 残片不足或已发掘";
+                            statusText = "❌ 残片不足";
                             statusTimer = 2f;
                         }
                     }

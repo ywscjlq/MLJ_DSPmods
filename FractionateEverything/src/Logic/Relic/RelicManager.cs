@@ -65,10 +65,19 @@ public static class RelicManager {
     public static bool IsDiscovered(int templateId) => _discoveredIds.Contains(templateId);
 
     // ======================== 遗物发掘 ========================
+    /// <summary>根据协议完成数，返回当前最大可发掘的时代</summary>
+    public static RelicEra MaxEraForProtocols(int completedProtocols) {
+        if (completedProtocols >= 10) return RelicEra.Golden;
+        if (completedProtocols >= 5)  return RelicEra.Classical;
+        if (completedProtocols >= 2)  return RelicEra.Ancient;
+        return RelicEra.Primitive;
+    }
+
     /// <summary>尝试发掘一个指定遗物</summary>
-    public static bool Excavate(int templateId) {
+    public static bool Excavate(int templateId, int completedProtocols = 999) {
         if (!_templates.TryGetValue(templateId, out var tpl)) return false;
         if (_discoveredIds.Contains(templateId)) return false;
+        if ((int)tpl.Era > (int)MaxEraForProtocols(completedProtocols)) return false; // 时代未解锁
         if (TakeItemFromModData(IFE残片, tpl.ExcavationCost, out _) < tpl.ExcavationCost) return false;
 
         _discoveredIds.Add(templateId);
@@ -79,18 +88,20 @@ public static class RelicManager {
     }
 
     /// <summary>尝试发掘一个随机未发现的遗物（玩家不能指定）</summary>
-    public static bool TryExcavateRandom(Random random, out int templateId) {
+    public static bool TryExcavateRandom(Random random, out int templateId, int completedProtocols = 999) {
         templateId = -1;
+        RelicEra maxEra = MaxEraForProtocols(completedProtocols);
         var available = _templates.Values
             .Where(t => !_discoveredIds.Contains(t.Id))
-            .OrderByDescending(t => t.Era) // 高时代优先（更难→更贵→更好）
+            .Where(t => (int)t.Era <= (int)maxEra)
+            .OrderByDescending(t => t.Era)
             .ThenBy(_ => random.Next())
             .ToList();
         if (available.Count == 0) return false;
 
         int chosenIdx = random.Next(available.Count);
         var chosen = available[chosenIdx];
-        if (Excavate(chosen.Id)) {
+        if (Excavate(chosen.Id, completedProtocols)) {
             templateId = chosen.Id;
             return true;
         }
@@ -98,9 +109,9 @@ public static class RelicManager {
     }
 
     /// <summary>根据已完成的协议数量，免费概率发掘一次（协议完成时调用）</summary>
-    public static bool TryFreeExcavation(Random random) {
-        if (_discoveredIds.Count >= _templates.Count) return false; // 全收集了
-        return TryExcavateRandom(random, out _);
+    public static bool TryFreeExcavation(Random random, int completedProtocols = 999) {
+        if (_discoveredIds.Count >= _templates.Count) return false;
+        return TryExcavateRandom(random, out _, completedProtocols);
     }
 
     // ======================== 共鸣系统 ========================

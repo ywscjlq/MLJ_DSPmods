@@ -9,6 +9,7 @@ using FE.Logic.Fractionation.FracRecipes.Runtime;
 using FE.Logic.DataCenter;
 using FE.Logic.Items;
 using FE.Logic.Relic;
+using static FE.Logic.DataCenter.DataCenterInventory;
 using static FE.Utils.Utils;
 
 namespace FE.Logic.Fractionation.Process;
@@ -430,6 +431,20 @@ public static partial class ProcessManager {
                     }
                     RecordFractionatorPerfDetail(FractionatorPerfDetailProcessGetOutputs,
                         GetFractionatorPerfElapsed(perfDetailStart));
+                    // 远古遗物残片产出：每个成功分馏有基础15%概率产1枚IFE残片
+                    if (batchResult.SuccessCount > 0) {
+                        float fragmentChance = 0.15f * (1f + successBoost);
+                        int fragmentCount = 0;
+                        var rng = new System.Random((int)(__instance.seed + GameMain.gameTick));
+                        for (int i = 0; i < batchResult.SuccessCount; i++) {
+                            if (rng.NextDouble() < fragmentChance) {
+                                fragmentCount++;
+                            }
+                        }
+                        if (fragmentCount > 0) {
+                            AddItemToModData(IFE残片, fragmentCount);
+                        }
+                    }
                 }
 
                 recipe?.RecordSuccesses(batchResult.SuccessCount);

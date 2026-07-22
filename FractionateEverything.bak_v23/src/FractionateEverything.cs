@@ -1,0 +1,176 @@
+using UnityEngine;
+using FE.Logic.Fractionation.Presentation;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
+using BepInEx;
+using BepInEx.Configuration;
+using BuildBarTool;
+using CommonAPI;
+using CommonAPI.Systems;
+using CommonAPI.Systems.ModLocalization;
+using crecheng.DSPModSave;
+using FE.Lifecycle;
+using FE.Compatibility;
+using FE.Compatibility.Nebula;
+using FE.Logic.Gacha;
+using FE.UI.Foundation.Window;
+using FE.UI.MainPanel;
+using FE.UI.MainPanel.ProgressTask;
+using HarmonyLib;
+using NebulaAPI;
+using NebulaAPI.Interfaces;
+using xiaoye97;
+using static FE.Logic.DataCenter.DataCenterInventory;
+using static FE.Utils.Utils;
+using FE.Logic.Economy;
+using FE.UI.MainPanel.Setting;
+using FE.UI.MainPanel.ResourceInteraction;
+using FE.UI.MainPanel.Shell;
+
+namespace FE;
+
+[BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)]
+[BepInDependency(LDBToolPlugin.MODGUID)]
+[BepInDependency(DSPModSavePlugin.MODGUID)]
+[BepInDependency(CommonAPIPlugin.GUID)]
+[BepInDependency(BuildBarToolPlugin.GUID)]
+[BepInDependency(NebulaModAPI.API_GUID)]
+[BepInDependency(CheckPlugins.GUID)]
+[CommonAPISubmoduleDependency(nameof(CustomKeyBindSystem), nameof(ProtoRegistry), nameof(TabSystem),
+ nameof(LocalizationModule))]
+public class FractionateEverything : BaseUnityPlugin, IModCanSave, IMultiplayerModWithSettings {
+    #region Fields
+
+    public const string Tech1134IconPath = "Icons/Tech/1134";
+    public static int tab分馏;
+    public static string ModPath;
+    public static ResourceData FEAssets;
+    public static readonly Harmony harmony = new(PluginInfo.PLUGIN_GUID);
+
+    #endregion
+
+    #region Config
+
+    private static ConfigFile configFile;
+
+    public void LoadConfig() {
+        configFile = Config;
+        CheckPlugins.DisableMessageBox = Config.Bind("other", "DisableMessageBox", false,
+            "Don't show messagebox when FractionateEverything loaded.");
+        MainWindow.LoadConfig(Config);
+        Traverse.Create(Config).Property("OrphanedEntries").GetValue<Dictionary<ConfigDefinition, string>>().Clear();
+        Config.Save();
+    }
+
+    public static void SaveConfig() {
+        configFile.Save();
+    }
+
+    #endregion
+
+    public void Awake() {
+        using (ProtoRegistry.StartModLoad(PluginInfo.PLUGIN_GUID)) {
+            InitLogger(Logger);
+            FeatureBootstrap.AddTranslations();
+            LoadConfig();
+            tab分馏 = TabSystem.RegisterTab($"{PluginInfo.PLUGIN_GUID}:{PluginInfo.PLUGIN_GUID}Tab",
+                new("分馏页面".Translate(), Tech1134IconPath));
+            var executingAssembly = Assembly.GetExecutingAssembly();
+            ModPath = Path.GetDirectoryName(executingAssembly.Location);
+            FEAssets = new(PluginInfo.PLUGIN_GUID, "fe", ModPath);
+            FEAssets.LoadAssetBundle("fe");
+            ProtoRegistry.AddResource(FEAssets);
+            NebulaModAPI.RegisterPackets(executingAssembly);
+
+            LDBTool.PreAddDataAction += FeatureBootstrap.PreAddData;
+            LDBTool.PostAddDataAction += FeatureBootstrap.PostAddData;
+
+            string CheckPluginsNamespace = typeof(CheckPlugins).Namespace;
+            foreach (Type type in executingAssembly.GetTypes()) {
+                if (type.Namespace == null
+                    || (CheckPluginsNamespace != null && type.Namespace.StartsWith(CheckPluginsNamespace))) {
+                    continue;
+                }
+                harmony.PatchAll(type);
+            }
+
+            harmony.Patch(
+                AccessTools.Method(typeof(VFPreload), nameof(VFPreload.InvokeOnLoadWorkEnded)),
+                null,
+                new(typeof(FeatureBootstrap), nameof(FeatureBootstrap.FinalAction)) {
+                    after = [LDBToolPlugin.MODGUID]
+                }
+            );
+
+            MainWindow.Init();
+        }
+    }
+
+    private void Start() {
+        MyWindowManager.InitBaseObjects();
+        MyWindowManager.Enable(true);
+        GachaService.InitPools();
+    }
+
+    private void OnDestroy() {
+        MyWindowManager.Enable(false);
+    }
+
+    private void Update() {
+        MainWindow.OnInputUpdate();
+        SatisfactionFX.UpdateShake();
+        SatisfactionFX.UpdateFlash();
+        SatisfactionFX.ProcessMainThreadQueue();
+        MainTask.Tick();
+        if (GameMain.mainPlayer != null && GUIUtility.keyboardControl == 0) {
+            KeyCode[] quickKeys = new KeyCode[] { KeyCode.F1, KeyCode.F2, KeyCode.F3, KeyCode.F4, KeyCode.F5, KeyCode.F6 };
+            for (int i = 0; i < 6 && i < quickKeys.Length; i++) {
+                if (Input.GetKeyDown(quickKeys[i])) {
+                    FE.UI.MainPanel.ResourceInteraction.Exchange.QuickBuy(i);
+                }
+            }
+        }
+    }
+
+    #region IModCanSave & IMultiplayerModWithSettings
+
+    public void Import(BinaryReader r) {
+        FeatureSaveRegistry.IntoOtherSave();
+        int version = r.ReadInt32();
+        if (version < 10) {
+            if (r.BaseStream.CanSeek) {
+                r.BaseStream.Seek(0, SeekOrigin.End);
+            }
+            UIMessageBox.Show(
+                "FE存档版本不兼容标题".Translate(),
+                "FE存档版本不兼容内容".Translate(),
+                "确定".Translate(),
+                UIMessageBox.WARNING,
+                () => AddItemToModData(IFE残片, 5000));
+            return;
+        }
+        FeatureSaveRegistry.Import(r);
+    }
+
+    public void Export(BinaryWriter w) {
+        w.Write(10);// version，固定为10
+        FeatureSaveRegistry.Export(w);
+    }
+
+    public void IntoOtherSave() {
+        if (NebulaMultiplayerModAPI.IsClient) {
+            return;
+        }
+        FeatureSaveRegistry.IntoOtherSave();
+    }
+
+    public string Version => PluginInfo.PLUGIN_VERSION;
+
+    public bool CheckVersion(string hostVersion, string clientVersion) {
+        return hostVersion.Equals(clientVersion);
+    }
+
+    #endregion
+}

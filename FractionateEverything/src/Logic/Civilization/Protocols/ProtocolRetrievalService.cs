@@ -4,6 +4,7 @@ using FE.Compatibility.Nebula;
 using FE.Logic.Civilization.Analysis;
 using FE.Logic.DataCenter;
 using FE.Logic.Fractionation.FracRecipes;
+using FE.Logic.Relic;
 using static FE.Logic.DataCenter.DataCenterInventory;
 using static FE.Utils.Utils;
 
@@ -477,6 +478,10 @@ public static class ProtocolRetrievalService {
             : ProtocolRetrievalOutcome.Progressed;
         if (targetProgress.Completeness >= 100) {
             AddItemToModData(IFE记忆源点, 2);
+            // 30%概率免费发掘一个遗物
+            if (new System.Random().NextDouble() < 0.3) {
+                RelicManager.TryFreeExcavation(new System.Random());
+            }
         }
         return new(outcome, target.RecipeKey, oldCompleteness, targetProgress.Completeness, false,
             spentFragments, spentMemorySourcePoints, 0);

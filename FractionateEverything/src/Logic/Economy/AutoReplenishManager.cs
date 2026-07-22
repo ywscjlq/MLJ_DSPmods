@@ -54,7 +54,7 @@ public static class AutoReplenishManager {
 
     public static string[] BudgetOptionStrings => BudgetOptions;
 
-    public static long EffectiveBudget => Math.Min(TotalBudget, centerItemCount != null && centerItemCount.Length > 1099 ? centerItemCount[1099] : long.MaxValue);
+    public static long EffectiveBudget => Math.Min(TotalBudget, centerItemCount != null && centerItemCount.Length > IFE残片 ? centerItemCount[IFE残片] : long.MaxValue);
 
     private static float _modeIndex;
     public static int ModeIndex { get => (int)_modeIndex; set => _modeIndex = value; }
@@ -100,8 +100,8 @@ public static class AutoReplenishManager {
             if (need > 0) {
                 long fragCost = (long)need * 100;
                 if (cycleCumulativeCost + fragCost > EffectiveBudget) { cycleSkipCount++; continue; }
-                if (fragCost > 0 && centerItemCount != null && centerItemCount.Length > 1099 && centerItemCount[1099] >= fragCost) {
-                    TakeItemFromModData(1099, fragCost, out _);
+                if (fragCost > 0 && centerItemCount != null && centerItemCount.Length > IFE残片 && centerItemCount[IFE残片] >= fragCost) {
+                    TakeItemFromModData(IFE残片, fragCost, out _);
                     AddItemToModData(entry.ItemId, need, 0, true);
                     totalBuyFragments += fragCost;
                     cycleCumulativeCost += fragCost;
@@ -115,7 +115,7 @@ public static class AutoReplenishManager {
                 long canSell = stock - sellThreshold;
                 if (canSell > 0) {
                     long income = canSell * 50;
-                    AddItemToModData(1099, income, 0, true);
+                    AddItemToModData(IFE残片, income, 0, true);
                     TakeItemFromModData(entry.ItemId, canSell, out _);
                     totalSellFragments += income;
                     LogInfo("[AutoReplenish] 卖出 " + (LDB.items.Select(entry.ItemId)?.Name ?? "#" + entry.ItemId) + " x" + canSell + ", 收入" + income + "碎片");
@@ -175,7 +175,7 @@ public static class AutoReplenishManager {
 
     public static void FetchAndApplyAIStrategy() {
         try {
-            long frags = centerItemCount != null && centerItemCount.Length > 1099 ? centerItemCount[1099] : 0;
+            long frags = centerItemCount != null && centerItemCount.Length > IFE残片 ? centerItemCount[IFE残片] : 0;
             var cli = new WebClient { Encoding = Encoding.UTF8 };
             string prompt = $"你是戴森球计划AI策略顾问。玩家：{frags}IFE碎片，阶段{_unlockLevel}。给出auto_replenish配置(JSON): strategy_name, advice, budget_ratio(0-1), target_fragments(预留碎片数量), conservative(是否保守模式)。只输出纯JSON，不要markdown。";
             var req = $"{{\"messages\":[{{\"role\":\"user\",\"content\":\"{EscJson(prompt)}\"}}],\"max_tokens\":2048}}";

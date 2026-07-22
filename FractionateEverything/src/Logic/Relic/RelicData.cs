@@ -18,13 +18,6 @@ public enum RelicType {
     Glyph,
 }
 
-/// <summary>考古状态</summary>
-public enum ExcavationStatus {
-    Locked,
-    Available,
-    Excavated,
-}
-
 /// <summary>共鸣组合的类型</summary>
 public enum ResonanceType {
     None,
@@ -33,18 +26,7 @@ public enum ResonanceType {
     Cross,
 }
 
-/// <summary>单个遗物实例</summary>
-public class RelicInstance {
-    public int TemplateId { get; }
-    public int AssignedPlanet { get; set; } = -1;
-    public int AssignedSlot { get; set; } = -1;
-
-    public RelicInstance(int templateId) {
-        TemplateId = templateId;
-    }
-}
-
-/// <summary>遗物模板定义</summary>
+/// <summary>遗物模板定义（v3.0.0：不再有行星槽位）</summary>
 public class RelicTemplate {
     public int Id { get; }
     public string Name { get; }

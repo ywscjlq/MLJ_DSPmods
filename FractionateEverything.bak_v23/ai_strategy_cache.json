@@ -1,0 +1,465 @@
+{
+  "generated_at": "2026-05-31 21:00:00",
+  "strategies": {
+    "0": {
+      "meta": {
+        "strategy_name": "初始资源积累",
+        "budget_ratio": 0.7,
+        "target_fragments_reserve": 200,
+        "advice": "优先储备基础建材与能源，快速铺设传送带网络"
+      },
+      "auto_replenish": [
+        {
+          "item": "铁板",
+          "target": 500,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "基础建材，建造传送带和建筑"
+        },
+        {
+          "item": "铜线",
+          "target": 300,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "电路原料，科研必备"
+        },
+        {
+          "item": "石材",
+          "target": 200,
+          "limit_mult": 1.0,
+          "sell_mult": 0.5,
+          "reason": "熔炉和建筑"
+        },
+        {
+          "item": "钢材",
+          "target": 200,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "进阶建筑"
+        },
+        {
+          "item": "磁铁",
+          "target": 200,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "电磁组件原料"
+        },
+        {
+          "item": "电路板",
+          "target": 100,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "所有机器的核心元件"
+        },
+        {
+          "item": "电力组件",
+          "target": 100,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "发电和输电"
+        },
+        {
+          "item": "传送带",
+          "target": 300,
+          "limit_mult": 1.0,
+          "sell_mult": 0.2,
+          "reason": "物流骨干"
+        },
+        {
+          "item": "分拣器",
+          "target": 100,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "自动化基础"
+        },
+        {
+          "item": "煤矿",
+          "target": 500,
+          "limit_mult": 1.0,
+          "sell_mult": 0.5,
+          "reason": "火力发电燃料"
+        },
+        {
+          "item": "熔炉",
+          "target": 50,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "基础冶炼"
+        },
+        {
+          "item": "风力发电机",
+          "target": 20,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "早期电力"
+        },
+        {
+          "item": "电路元件",
+          "target": 200,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "电路板和处理器原料"
+        },
+        {
+          "item": "铜板",
+          "target": 500,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "基础材料"
+        },
+        {
+          "item": "线圈",
+          "target": 200,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "电动机原料"
+        }
+      ]
+    },
+    "1": {
+      "meta": {
+        "strategy_name": "工业化加速",
+        "budget_ratio": 0.7,
+        "target_fragments_reserve": 300,
+        "advice": "加速电磁组件和处理器生产，为规模化做准备"
+      },
+      "auto_replenish": [
+        {
+          "item": "铁板",
+          "target": 1000,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "基础建材需求暴增"
+        },
+        {
+          "item": "钢材",
+          "target": 500,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "进阶建筑和MK2设备"
+        },
+        {
+          "item": "磁铁",
+          "target": 500,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "电磁组件核心"
+        },
+        {
+          "item": "电路板",
+          "target": 300,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "处理器和生产自动化"
+        },
+        {
+          "item": "处理器",
+          "target": 100,
+          "limit_mult": 1.0,
+          "sell_mult": 0.2,
+          "reason": "高级机器和物流站"
+        },
+        {
+          "item": "电力组件",
+          "target": 300,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "大规模电力系统"
+        },
+        {
+          "item": "传送带",
+          "target": 500,
+          "limit_mult": 1.0,
+          "sell_mult": 0.2,
+          "reason": "物流网络扩展"
+        },
+        {
+          "item": "分拣器MK2",
+          "target": 100,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "高速分拣"
+        },
+        {
+          "item": "铜线",
+          "target": 500,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "电路板原料"
+        },
+        {
+          "item": "煤矿",
+          "target": 500,
+          "limit_mult": 1.0,
+          "sell_mult": 0.5,
+          "reason": "火力发电补充"
+        },
+        {
+          "item": "电动机",
+          "target": 200,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "电磁组件和高级机器"
+        },
+        {
+          "item": "钛合金",
+          "target": 100,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "物流站和高级建筑"
+        },
+        {
+          "item": "硫酸",
+          "target": 200,
+          "limit_mult": 1.0,
+          "sell_mult": 0.5,
+          "reason": "化工原料"
+        },
+        {
+          "item": "玻璃",
+          "target": 200,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "处理器和光学组件"
+        },
+        {
+          "item": "MK1传送带",
+          "target": 300,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "物流基础"
+        }
+      ]
+    },
+    "2": {
+      "meta": {
+        "strategy_name": "规模化自动补货",
+        "budget_ratio": 0.6,
+        "target_fragments_reserve": 500,
+        "advice": "重点保障中间件产能，处理器和合金是瓶颈"
+      },
+      "auto_replenish": [
+        {
+          "item": "处理器",
+          "target": 300,
+          "limit_mult": 1.0,
+          "sell_mult": 0.2,
+          "reason": "所有高级机器的瓶颈"
+        },
+        {
+          "item": "钛合金",
+          "target": 300,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "物流站和星际运输"
+        },
+        {
+          "item": "电动机",
+          "target": 500,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "涡轮和电磁组件"
+        },
+        {
+          "item": "电磁组件",
+          "target": 300,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "高能设备和反物质系统"
+        },
+        {
+          "item": "钢铁",
+          "target": 1000,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "大型建筑"
+        },
+        {
+          "item": "电路板",
+          "target": 500,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "处理器原料"
+        },
+        {
+          "item": "塑料",
+          "target": 300,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "有机化工原料"
+        },
+        {
+          "item": "硫酸",
+          "target": 500,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "化学工艺和芯片"
+        },
+        {
+          "item": "石墨烯",
+          "target": 200,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "碳纳米管和高级材料"
+        },
+        {
+          "item": "星际物流站",
+          "target": 10,
+          "limit_mult": 1.0,
+          "sell_mult": 0.1,
+          "reason": "行星间物流枢纽"
+        },
+        {
+          "item": "镍矿",
+          "target": 200,
+          "limit_mult": 1.0,
+          "sell_mult": 0.5,
+          "reason": "合金和高等化学"
+        },
+        {
+          "item": "碳纳米管",
+          "target": 100,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "量子芯片和戴森球"
+        },
+        {
+          "item": "过滤器",
+          "target": 100,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "化工厂和精炼设备"
+        },
+        {
+          "item": "分砾器",
+          "target": 50,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "分馏设施"
+        },
+        {
+          "item": "暖锋燃料棒",
+          "target": 100,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "轨道炮和飞船燃料"
+        }
+      ]
+    },
+    "3": {
+      "meta": {
+        "strategy_name": "黑雾终焉全自动补货",
+        "budget_ratio": 0.5,
+        "target_fragments_reserve": 1000,
+        "advice": "反物质和奇异燃料棒是终极战争的核心，保证弹药充足"
+      },
+      "auto_replenish": [
+        {
+          "item": "奇异湮灭燃料棒",
+          "target": 50,
+          "limit_mult": 1.0,
+          "sell_mult": 0.1,
+          "reason": "终极能量和黑雾战争"
+        },
+        {
+          "item": "反物质",
+          "target": 200,
+          "limit_mult": 1.0,
+          "sell_mult": 0.1,
+          "reason": "戴森球核心"
+        },
+        {
+          "item": "处理器",
+          "target": 500,
+          "limit_mult": 1.0,
+          "sell_mult": 0.2,
+          "reason": "量子芯片原料"
+        },
+        {
+          "item": "量子芯片",
+          "target": 100,
+          "limit_mult": 1.0,
+          "sell_mult": 0.2,
+          "reason": "超级计算机和AI"
+        },
+        {
+          "item": "太阳帆",
+          "target": 500,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "戴森球建设"
+        },
+        {
+          "item": "碳纳米管",
+          "target": 300,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "量子芯片和戴森球"
+        },
+        {
+          "item": "钛合金",
+          "target": 500,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "大型结构"
+        },
+        {
+          "item": "电磁组件",
+          "target": 500,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "高能武器和轨道炮"
+        },
+        {
+          "item": "轨道炮",
+          "target": 30,
+          "limit_mult": 1.0,
+          "sell_mult": 0.1,
+          "reason": "黑雾防御"
+        },
+        {
+          "item": "导弹",
+          "target": 200,
+          "limit_mult": 1.0,
+          "sell_mult": 0.2,
+          "reason": "黑雾战斗弹药"
+        },
+        {
+          "item": "地基",
+          "target": 200,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "大规模铺地和扩展"
+        },
+        {
+          "item": "核电站",
+          "target": 10,
+          "limit_mult": 1.0,
+          "sell_mult": 0.2,
+          "reason": "大规模供电"
+        },
+        {
+          "item": "加速器",
+          "target": 50,
+          "limit_mult": 1.0,
+          "sell_mult": 0.2,
+          "reason": "粒子对撞和反物质"
+        },
+        {
+          "item": "重氢燃料棒",
+          "target": 200,
+          "limit_mult": 1.0,
+          "sell_mult": 0.3,
+          "reason": "轨道炮和飞船"
+        },
+        {
+          "item": "黑雾矩阵",
+          "target": 100,
+          "limit_mult": 1.0,
+          "sell_mult": 0.2,
+          "reason": "黑雾先进科技"
+        }
+      ]
+    }
+  }
+}

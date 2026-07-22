@@ -13,6 +13,7 @@ using FE.Lifecycle;
 using FE.Compatibility;
 using FE.Compatibility.Nebula;
 using FE.Logic.Civilization;
+using FE.Logic.Economy;
 using FE.UI.Foundation.Window;
 using FE.UI.MainPanel;
 using HarmonyLib;
@@ -153,6 +154,7 @@ public class FractionateEverything : BaseUnityPlugin, IModCanSave, IMultiplayerM
     private void Update() {
         MainWindow.OnInputUpdate();
         CivilizationModule.Tick();
+        AutoReplenishManager.Tick();
     }
 
     #region IModCanSave & IMultiplayerModWithSettings

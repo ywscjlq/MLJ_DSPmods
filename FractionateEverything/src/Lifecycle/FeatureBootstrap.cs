@@ -1,5 +1,7 @@
 ﻿using FE.Logic.Buildings;
 using FE.Logic.Civilization;
+using FE.Logic.Economy;
+using FE.Logic.Relic;
 using FE.Logic.Fractionation.Process;
 using FE.Logic.Fractionation.FracRecipes;
 using FE.Logic.Items;
@@ -73,6 +75,10 @@ public static class FeatureBootstrap {
         // AddFracRecipes 用到了 Init 生成的数据
         RecipeManager.AddFracRecipes();
         CivilizationModule.Initialize();
+        AutoReplenishManager.Init();
+        // 遗物系统初始化（无额外状态，模板已经静态构造函数完成）
+        // 在Init最后调用以确保所有子系统就绪
+        LogInfo("[Relic] 协议遗物系统就绪");
         VanillaRecipeManager.AddVanillaRecipes();
         // CalculateItemModSaveCount 用到了 CalculateItemValues 生成的数据
         StationManager.CalculateItemModSaveCount();

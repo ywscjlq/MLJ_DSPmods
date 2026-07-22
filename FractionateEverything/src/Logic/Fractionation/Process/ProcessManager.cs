@@ -8,6 +8,7 @@ using FE.Logic.Fractionation.FracRecipes;
 using FE.Logic.Fractionation.FracRecipes.Runtime;
 using FE.Logic.DataCenter;
 using FE.Logic.Items;
+using FE.Logic.Relic;
 using static FE.Utils.Utils;
 
 namespace FE.Logic.Fractionation.Process;

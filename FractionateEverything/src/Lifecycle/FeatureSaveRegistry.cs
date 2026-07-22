@@ -2,6 +2,7 @@
 using FE.Logic.Buildings;
 using FE.Logic.Civilization;
 using FE.Logic.DarkFog;
+using FE.Logic.Economy;
 using FE.Logic.Fractionation.Process;
 using FE.Logic.Fractionation.FracRecipes;
 using FE.Logic.DataCenter;
@@ -9,6 +10,7 @@ using FE.Logic.Progression;
 using FE.Logic.Station;
 using FE.Logic.VanillaRecipes;
 using FE.UI.MainPanel;
+using FE.Logic.Relic;
 using static FE.Utils.Utils;
 
 namespace FE.Lifecycle;
@@ -29,6 +31,14 @@ public static class FeatureSaveRegistry {
             ("UI", MainWindow.Import),
             ("Station", StationManager.Import)
         );
+        AutoReplenishManager.Import(r);
+        AutoReplenishManager.FetchAndApplyAIStrategy();
+
+        // 遗物存档（向后兼容：旧存档无此块时跳过）
+        if (r.BaseStream.Position < r.BaseStream.Length) {
+            RelicManager.Import(r);
+        }
+
         VanillaRecipeManager.SyncRuntimeStateAfterImport();
         CivilizationModule.AfterImport();
     }
@@ -45,6 +55,8 @@ public static class FeatureSaveRegistry {
             ("UI", MainWindow.Export),
             ("Station", StationManager.Export)
         );
+        AutoReplenishManager.Export(w);
+        RelicManager.Export(w);
     }
 
     public static void IntoOtherSave() {
@@ -59,6 +71,8 @@ public static class FeatureSaveRegistry {
         MainWindow.IntoOtherSave();
         StationManager.IntoOtherSave();
 
+        AutoReplenishManager.IntoOtherSave();
         TechManager.ResetTechUnlockFlags();
+        RelicManager.IntoOtherSave();
     }
 }

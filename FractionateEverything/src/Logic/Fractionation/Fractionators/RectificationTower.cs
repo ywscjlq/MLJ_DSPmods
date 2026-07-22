@@ -95,7 +95,8 @@ public static class RectificationTower {
         if (DSPGame.IsMenuDemo || GameMain.mainPlayer == null) {
             return;
         }
-        ModelProto fractionatorModel = LDB.models.Select(M分馏塔);
+        model ??= LDB.models.Select(M分馏塔);
+        ModelProto fractionatorModel = model;
         model.HpMax = fractionatorModel.HpMax;
         workEnergyPerTick = (long)(fractionatorModel.prefabDesc.workEnergyPerTick * EnergyRatio);
         idleEnergyPerTick = (long)(fractionatorModel.prefabDesc.idleEnergyPerTick * EnergyRatio);

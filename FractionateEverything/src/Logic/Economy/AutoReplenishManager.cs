@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 using static FE.Utils.Utils;
 using static FE.Logic.DataCenter.DataCenterInventory;
@@ -180,11 +181,14 @@ public static class AutoReplenishManager {
             string prompt = $"你是戴森球计划AI策略顾问。玩家：{frags}IFE碎片，阶段{_unlockLevel}。给出auto_replenish配置(JSON): strategy_name, advice, budget_ratio(0-1), target_fragments(预留碎片数量), conservative(是否保守模式)。只输出纯JSON，不要markdown。";
             var req = $"{{\"messages\":[{{\"role\":\"user\",\"content\":\"{EscJson(prompt)}\"}}],\"max_tokens\":2048}}";
             var resp = cli.UploadString("http://127.0.0.1:8080/v1/chat/completions", req);
-            var json = resp;
-            int os = json.IndexOf('{'), oe = json.LastIndexOf('}') + 1;
-            if (os >= 0 && oe > os) {
-                ApplyStrategy(json.Substring(os, oe - os), frags, _unlockLevel);
-                aiStrategyApplied = true;
+            var choices = JObject.Parse(resp)["choices"];
+            if (choices != null && choices.HasValues) {
+                string jsonContent = choices[0]["message"]?.Value<string>("content") ?? "";
+                int os = jsonContent.IndexOf('{'), oe = jsonContent.LastIndexOf('}') + 1;
+                if (os >= 0 && oe > os) {
+                    ApplyStrategy(jsonContent.Substring(os, oe - os), frags, _unlockLevel);
+                    aiStrategyApplied = true;
+                }
             }
         } catch {
             // AI不可用时静默失败
@@ -193,43 +197,17 @@ public static class AutoReplenishManager {
 
     static void ApplyStrategy(string json, long frags, int stage) {
         try {
-            int bi = json.IndexOf("\"budget_ratio\"");
-            if (bi < 0) return;
-            int cv = json.IndexOf(':', bi);
-            if (cv < 0) return;
-            int ci = json.IndexOf(',', cv);
-            int ci2 = json.IndexOf('}', cv);
-            int end = ci > 0 && ci < ci2 ? ci : ci2;
-            string vs = json.Substring(cv + 1, end - cv - 1).Trim();
-            if (float.TryParse(vs, out float ratio) && ratio > 0f) {
+            JObject obj = JObject.Parse(json);
+            float ratio = obj.Value<float>("budget_ratio");
+            if (ratio > 0f) {
                 _currentBudgetIndex = ratio < 0.3f ? 0 : ratio < 0.6f ? 1 : ratio < 0.9f ? 2 : 3;
             }
-            int ti = json.IndexOf("\"target_fragments\"");
-            if (ti >= 0) {
-                int cv2 = json.IndexOf(':', ti);
-                int ce = json.IndexOf(',', cv2);
-                int ce2 = json.IndexOf('}', cv2);
-                int en = ce > 0 && ce < ce2 ? ce : ce2;
-                string ts = json.Substring(cv2 + 1, en - cv2 - 1).Trim();
-                if (long.TryParse(ts, out long target)) reserveFragmentCount = target;
-            }
-            int si = json.IndexOf("\"conservative\"");
-            if (si >= 0) {
-                int scv = json.IndexOf(':', si);
-                int se = json.IndexOf(',', scv);
-                int se2 = json.IndexOf('}', scv);
-                int se3 = json.IndexOf(']', scv);
-                int sen = se > 0 && se < se2 ? se : (se2 < se3 ? se2 : se3);
-                string sv = json.Substring(scv + 1, sen - scv - 1).Trim().ToLower();
-                _modeIndex = sv.Contains("true") ? 0 : 1;
-            }
-            int ai = json.IndexOf("\"advice\"");
-            if (ai >= 0) {
-                int acv = json.IndexOf(':', ai);
-                int aqs = json.IndexOf('"', acv + 1);
-                int aqe = json.IndexOf('"', aqs + 1);
-                if (aqs >= 0 && aqe > aqs) aiSuggestion = json.Substring(aqs + 1, aqe - aqs - 1);
-            }
+            long target = obj.Value<long>("target_fragments");
+            if (target > 0) reserveFragmentCount = target;
+            bool conservative = obj.Value<bool>("conservative");
+            _modeIndex = conservative ? 0 : 1;
+            string advice = obj.Value<string>("advice");
+            if (!string.IsNullOrEmpty(advice)) aiSuggestion = advice;
             LogInfo($"[AutoReplenish] AI策略已应用: budgetIdx={_currentBudgetIndex}, mode={_modeIndex}, reserve={reserveFragmentCount}");
         } catch { }
     }

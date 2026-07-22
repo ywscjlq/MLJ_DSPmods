@@ -43,18 +43,18 @@ public static class RelicManager {
         t[5] = new(5, "水晶谐振器", "水晶结构在特定频率下增强分离效率", RelicEra.Ancient, RelicType.Catalyst, pc(1), 0) { SpeedMultiplier = 1.25f };
         t[6] = new(6, "星图碎片", "残破的星图指引了更优的轨道设计", RelicEra.Ancient, RelicType.Glyph, pc(1), 1) { SuccessBonus = 0.08f };
         t[7] = new(7, "重力井核心", "微型重力场约束粒子运动轨迹", RelicEra.Ancient, RelicType.Core, pc(1), 2) { SpeedMultiplier = 1.3f, SuccessBonus = 0.05f };
-        t[8] = new(8, "等离子透镜", "高温等离子体折射提升分离纯度", RelicEra.Ancient, RelicType.Lens, pc(1), 3, true) { ByproductChance = 0.15f, ByproductItemId = 1120 };
+        t[8] = new(8, "等离子透镜", "高温等离子体折射提升分离纯度", RelicEra.Ancient, RelicType.Lens, pc(1), 3, true) { ByproductChance = 0.15f, ByproductItemId = RelicItemIds.PlasmaByproduct };
 
         // ── 古典 (Classical, 10碎片) ──
         t[9] = new(9, "量子纠缠器", "量子态同步实现超距协同", RelicEra.Classical, RelicType.Core, pc(2), 0) { SpeedMultiplier = 1.4f };
         t[10] = new(10, "戴森环残片", "戴森球技术的早期原型遗骸", RelicEra.Classical, RelicType.Lens, pc(2), 1) { SpeedMultiplier = 1.5f };
         t[11] = new(11, "暗流驱动", "利用暗物质流体增强循环动力", RelicEra.Classical, RelicType.Catalyst, pc(2), 2) { SpeedMultiplier = 1.35f, SuccessBonus = 0.1f };
-        t[12] = new(12, "熵减协议", "逆转局部的熵增为有序能量", RelicEra.Classical, RelicType.Glyph, pc(2), 3, true) { SuccessBonus = 0.2f, ByproductChance = 0.1f, ByproductItemId = 1121 };
+        t[12] = new(12, "熵减协议", "逆转局部的熵增为有序能量", RelicEra.Classical, RelicType.Glyph, pc(2), 3, true) { SuccessBonus = 0.2f, ByproductChance = 0.1f, ByproductItemId = RelicItemIds.EntropyByproduct };
 
         // ── 黄金 (Golden, 20碎片) ──
         t[13] = new(13, "奇点核心", "微型黑洞的稳定化能量提取", RelicEra.Golden, RelicType.Core, pc(3), 0) { SpeedMultiplier = 1.8f, SuccessBonus = 0.1f };
         t[14] = new(14, "创世透镜", "重组粒子结构的终极装置", RelicEra.Golden, RelicType.Lens, pc(3), 1) { SpeedMultiplier = 2.0f };
-        t[15] = new(15, "无尽催化环", "理论上永续的催化循环", RelicEra.Golden, RelicType.Catalyst, pc(3), 2) { SpeedMultiplier = 1.6f, SuccessBonus = 0.15f, ByproductChance = 0.2f, ByproductItemId = 1122 };
+        t[15] = new(15, "无尽催化环", "理论上永续的催化循环", RelicEra.Golden, RelicType.Catalyst, pc(3), 2) { SpeedMultiplier = 1.6f, SuccessBonus = 0.15f, ByproductChance = 0.2f, ByproductItemId = RelicItemIds.InfiniteCatalystByproduct };
         t[16] = new(16, "终焉符文", "失落文明的最终技术结晶", RelicEra.Golden, RelicType.Glyph, pc(3), 3, true) { SpeedMultiplier = 2.2f, SuccessBonus = 0.25f };
     }
 

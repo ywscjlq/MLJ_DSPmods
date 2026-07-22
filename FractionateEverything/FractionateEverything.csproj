@@ -33,6 +33,7 @@
         2.使用BepInEx.AssemblyPublicizer.Cli.exe，手动publicize戴森球目录的对应dll，再将处理过的dll覆盖nuget
         -->
         <PackageReference Include="DysonSphereProgram.GameLibs" Version="*-*"/>
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.3"/>
         <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all"/>
         <Reference Include="BuildBarTool">
             <HintPath>$(BuildBarToolHintPath)</HintPath>

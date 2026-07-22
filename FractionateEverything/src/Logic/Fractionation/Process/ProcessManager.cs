@@ -1022,32 +1022,7 @@ public static partial class ProcessManager {
     /// <summary>
     /// 将该分馏域状态写入存档。
     /// </summary>
-    public static void Export(BinaryWriter w) {
-        w.WriteBlocks(
-            ("TotalFractionSuccesses", bw => bw.Write(totalFractionSuccesses)),
-            ("PeakFractionSuccessesPerMinute", bw => bw.Write(peakFractionSuccessesPerMinute))
-        );
-    }
-
-    /// <summary>
-    /// 从存档读取该分馏域状态。
-    /// </summary>
-    public static void Import(BinaryReader r) {
-        ResetFractionRateWindow();
-        r.ReadBlocks(
-            ("TotalFractionSuccesses", br => totalFractionSuccesses = Math.Max(0, br.ReadInt64())),
-            ("PeakFractionSuccessesPerMinute", br => peakFractionSuccessesPerMinute = Math.Max(0, br.ReadInt64()))
-        );
-    }
-
-    /// <summary>
-    /// 切换或进入其他存档时重置该分馏域状态。
-    /// </summary>
-    public static void IntoOtherSave() {
-        totalFractionSuccesses = 0;
-        peakFractionSuccessesPerMinute = 0;
-        ResetFractionRateWindow();
-    }
+    // Save/Export/IntoOtherSave → 见 ProcessManager.Save.cs
 
     #endregion
 }

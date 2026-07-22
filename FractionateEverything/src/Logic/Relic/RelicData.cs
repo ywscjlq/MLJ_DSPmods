@@ -2,6 +2,13 @@ using System.Collections.Generic;
 
 namespace FE.Logic.Relic;
 
+/// <summary>遗物副产物物品ID常量，避免硬编码</summary>
+public static class RelicItemIds {
+    public const int PlasmaByproduct = 1120;   // 等离子透镜副产物
+    public const int EntropyByproduct = 1121;  // 熵减协议副产物
+    public const int InfiniteCatalystByproduct = 1122; // 无尽催化环副产物
+}
+
 /// <summary>遗物时代层级</summary>
 public enum RelicEra {
     Primitive = 0,

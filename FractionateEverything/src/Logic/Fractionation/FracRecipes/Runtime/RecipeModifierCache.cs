@@ -18,6 +18,11 @@ public static class RecipeModifierCache {
         relicByproductEntries.Clear();
     }
 
+    /// <summary>清空副产物条目，用于重新注册前防累积</summary>
+    public static void ClearRelicByproducts() {
+        relicByproductEntries.Clear();
+    }
+
     public static void AddSuccessRateBonus(ERecipe recipeType, float bonus) {
         if (bonus <= 0f) {
             return;

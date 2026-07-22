@@ -176,7 +176,8 @@ public static class RelicManager {
         RecipeModifierCache.AddAllRecipeSuccessRateBonus(suc);
         LogInfo($"[Relic] 全局加成已更新: 成功率+{suc * 100:F0}% (来自{_discoveredIds.Count}/{_templates.Count}个遗物)");
 
-        // 注册遗物副产物产出
+        // 注册遗物副产物产出（先清空防 ApplyActiveBonuses 多次调用导致概率累积）
+        RecipeModifierCache.ClearRelicByproducts();
         foreach (int tid in _discoveredIds) {
             if (_templates.TryGetValue(tid, out var tpl) && tpl.ByproductChance > 0f && tpl.ByproductItemId > 0) {
                 RecipeModifierCache.AddRelicByproduct(tpl.ByproductItemId, tpl.ByproductChance);

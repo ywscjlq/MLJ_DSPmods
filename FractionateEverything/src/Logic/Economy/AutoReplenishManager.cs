@@ -190,8 +190,8 @@ public static class AutoReplenishManager {
                     aiStrategyApplied = true;
                 }
             }
-        } catch {
-            // AI不可用时静默失败
+        } catch (System.Exception ex) {
+            LogInfo($"[AutoReplenish] AI策略请求失败: {ex.Message}");
         }
     }
 
@@ -209,7 +209,9 @@ public static class AutoReplenishManager {
             string advice = obj.Value<string>("advice");
             if (!string.IsNullOrEmpty(advice)) aiSuggestion = advice;
             LogInfo($"[AutoReplenish] AI策略已应用: budgetIdx={_currentBudgetIndex}, mode={_modeIndex}, reserve={reserveFragmentCount}");
-        } catch { }
+        } catch (System.Exception ex) {
+            LogInfo($"[AutoReplenish] AI策略解析失败: {ex.Message}");
+        }
     }
 
     static string EscJson(string s) {

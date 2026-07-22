@@ -14,6 +14,8 @@ namespace FE.Logic.Fractionation.Fractionators;
 public static class InteractionTower {
     private static ItemProto item;
     private static ModelProto model;
+    /// <summary>原版分馏塔模型缓存（避免每帧 LDB 查找）</summary>
+    private static ModelProto _vanillaModel;
     /// <summary>
     /// 保存该分馏塔原型使用的主题颜色。
     /// </summary>
@@ -95,8 +97,8 @@ public static class InteractionTower {
         if (DSPGame.IsMenuDemo || GameMain.mainPlayer == null) {
             return;
         }
-        model ??= LDB.models.Select(M分馏塔);
-        ModelProto fractionatorModel = model;
+        _vanillaModel ??= LDB.models.Select(M分馏塔);
+        ModelProto fractionatorModel = _vanillaModel;
         model.HpMax = fractionatorModel.HpMax;
         workEnergyPerTick = (long)(fractionatorModel.prefabDesc.workEnergyPerTick * EnergyRatio);
         idleEnergyPerTick = (long)(fractionatorModel.prefabDesc.idleEnergyPerTick * EnergyRatio);

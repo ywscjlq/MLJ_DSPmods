@@ -249,7 +249,7 @@ public static class SlotMachine {
     // ═══════════════════════════════════════════════
 
     public static void OnGUI() {
-        if (hook == null) return;
+        if (hook == null || !hook.gameObject.activeInHierarchy) return;
 
         const float W = 620, H = 680;
         float x = Screen.width / 2f - W / 2f - 80;

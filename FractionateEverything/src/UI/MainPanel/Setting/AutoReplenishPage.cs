@@ -41,8 +41,10 @@ public static class AutoReplenishPage {
 
         private void OnGUI() {
             if (!enabled) return;
-            Rect parent = new(0, 0, Screen.width, Screen.height);
-            float x = 10, y = 10, w = Mathf.Min(parent.width - 20, 600);
+            const float W = 580;
+            float x = Screen.width / 2f - W / 2f - 80;
+            float y = Screen.height / 2f - 280f;
+            float w = W;
 
             DrawHeader(ref x, ref y, w);
             y = DrawSettings(x, y + 5, w);

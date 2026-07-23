@@ -10,6 +10,7 @@ using FE.Logic.Progression;
 using FE.Logic.Station;
 using FE.Logic.VanillaRecipes;
 using FE.UI.MainPanel;
+using FE.UI.MainPanel.Setting;
 using FE.Logic.Relic;
 using static FE.Utils.Utils;
 
@@ -39,6 +40,11 @@ public static class FeatureSaveRegistry {
             RelicManager.Import(r);
         }
 
+        // 老虎机存档
+        if (r.BaseStream.Position < r.BaseStream.Length) {
+            SlotMachine.Import(r);
+        }
+
         VanillaRecipeManager.SyncRuntimeStateAfterImport();
         CivilizationModule.AfterImport();
     }
@@ -57,6 +63,7 @@ public static class FeatureSaveRegistry {
         );
         AutoReplenishManager.Export(w);
         RelicManager.Export(w);
+        SlotMachine.Export(w);
     }
 
     public static void IntoOtherSave() {
@@ -74,5 +81,6 @@ public static class FeatureSaveRegistry {
         AutoReplenishManager.IntoOtherSave();
         TechManager.ResetTechUnlockFlags();
         RelicManager.IntoOtherSave();
+        SlotMachine.IntoOtherSave();
     }
 }

@@ -81,6 +81,7 @@ public static class MainWindow {
         RecipeGallery.LoadConfig(configFile);
 
         Miscellaneous.LoadConfig(configFile);
+        SlotMachine.LoadConfig(configFile);
     }
 
     public static void Init() {

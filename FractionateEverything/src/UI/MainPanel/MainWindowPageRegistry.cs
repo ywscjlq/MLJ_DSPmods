@@ -50,6 +50,7 @@ public static class MainWindowPageRegistry {
         new(SystemSettingCategoryName, "杂项设置", Miscellaneous.CreateUI, Miscellaneous.UpdateUI),
         new(SystemSettingCategoryName, "自动补货", AutoReplenishPage.CreateUI, AutoReplenishPage.UpdateUI),
         new(SystemSettingCategoryName, "协议遗物", RelicPage.CreateUI, RelicPage.UpdateUI),
+        new(SystemSettingCategoryName, "🎰 老虎机", SlotMachine.CreateUI, SlotMachine.UpdateUI),
     ];
 
     private static readonly IReadOnlyList<MainWindowCategoryDefinition>[,,] categoryCache = BuildCategoryCache();

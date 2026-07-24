@@ -74,7 +74,7 @@ public static class NebulaMultiplayerModAPI {
     }
 
     /// <summary>
-    /// 广播文明进度、配方校准和两种检索货币的当前权威快照。
+    /// 广播文明进度、配方校准和残片余额的当前权威快照。
     /// </summary>
     public static void BroadcastCivilizationState() {
         if (!NebulaModAPI.IsMultiplayerActive
@@ -95,16 +95,12 @@ public static class NebulaMultiplayerModAPI {
 
         long fragments;
         long fragmentInc;
-        long memorySourcePoints;
-        long memorySourcePointInc;
         lock (centerItemCount) {
             fragments = centerItemCount[IFE残片];
             fragmentInc = centerItemInc[IFE残片];
-            memorySourcePoints = centerItemCount[IFE记忆源点];
-            memorySourcePointInc = centerItemInc[IFE记忆源点];
         }
         NebulaModAPI.MultiplayerSession.Network.SendPacket(new CivilizationStatePacket(stateData,
-            fragments, fragmentInc, memorySourcePoints, memorySourcePointInc));
+            fragments, fragmentInc));
     }
 
     /// <summary>
@@ -238,18 +234,13 @@ public class CivilizationStatePacket {
     public byte[] data { get; set; }
     public long fragments { get; set; }
     public long fragmentInc { get; set; }
-    public long memorySourcePoints { get; set; }
-    public long memorySourcePointInc { get; set; }
 
     public CivilizationStatePacket() { }
 
-    public CivilizationStatePacket(byte[] data, long fragments, long fragmentInc,
-        long memorySourcePoints, long memorySourcePointInc) {
+    public CivilizationStatePacket(byte[] data, long fragments, long fragmentInc) {
         this.data = data;
         this.fragments = fragments;
         this.fragmentInc = fragmentInc;
-        this.memorySourcePoints = memorySourcePoints;
-        this.memorySourcePointInc = memorySourcePointInc;
     }
 }
 
@@ -272,16 +263,9 @@ public class CivilizationStatePacketProcessor : BasePacketProcessor<Civilization
         }
         lock (centerItemCount) {
             long fragmentCount = Math.Max(0L, packet.fragments);
-            long memorySourcePointCount = Math.Max(0L, packet.memorySourcePoints);
             long fragmentMaxInc = fragmentCount > long.MaxValue / 10L ? long.MaxValue : fragmentCount * 10L;
-            long memorySourcePointMaxInc = memorySourcePointCount > long.MaxValue / 10L
-                ? long.MaxValue
-                : memorySourcePointCount * 10L;
             centerItemCount[IFE残片] = fragmentCount;
             centerItemInc[IFE残片] = Math.Max(0L, Math.Min(packet.fragmentInc, fragmentMaxInc));
-            centerItemCount[IFE记忆源点] = memorySourcePointCount;
-            centerItemInc[IFE记忆源点] = Math.Max(0L,
-                Math.Min(packet.memorySourcePointInc, memorySourcePointMaxInc));
         }
         CivilizationModule.AfterImport();
     }
@@ -421,7 +405,8 @@ public class BuildingChangePacketProcessor : BasePacketProcessor<BuildingChangeP
                 FractionatorSingleLock.ApplyLockedOutputPacket(packet.planetId, packet.entityId, packet.itemId);
                 break;
             case 3:
-                AnalysisLineageTarget.ApplyLineageTargetPacket(packet.planetId, packet.entityId, packet.itemId);
+                // 兼容旧版解析谱系目标包；新版四塔统一使用主路目标包类型 2。
+                FractionatorSingleLock.ApplyLockedOutputPacket(packet.planetId, packet.entityId, packet.itemId);
                 break;
             case 4:
                 FractionatorByproductDiscard.ApplyPacket(packet.planetId, packet.entityId, packet.itemId != 0);

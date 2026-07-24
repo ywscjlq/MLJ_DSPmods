@@ -62,8 +62,7 @@ Fractionation hot path -> runtime caches
 
 | 资源或状态 | 用途 | 不允许的用途 |
 |---|---|---|
-| 残片 | 支付方向检索 | 购买科技、保证锚定结果 |
-| 记忆源点 | 支付锚定检索 | 购买科技、兑换残片 |
+| 残片 | 支付方向检索和锚定检索 | 购买科技、兑换其他文明货币 |
 | 远古文明科技点 | 购买科技树节点 | 协议检索、普通库存交易 |
 | 检索机会 | 执行当前阶段检索或深层解析 | 跨阶段转移、物品化交易 |
 | 实体解析数据 | 上传并生成对应阶段检索机会 | 进入普通数据中心库存 |
@@ -143,7 +142,7 @@ ceil(BaseCost(stage) * 1.32 ^ n)
 |---|---:|---|---|
 | 广域检索 | 0 | 阶段全部可行动协议 | 允许无效响应 |
 | 方向检索 | 残片 8 | 指定 `ERecipe` 方向 | 允许无效响应 |
-| 锚定检索 | 记忆源点 1 | 指定未完成协议 | 必定发现或推进目标 |
+| 锚定检索 | 残片 32 | 指定未完成协议 | 必定发现或推进目标 |
 
 默认批量数为 `10`。批量入口逐次调用同一单次规则，每一步更新候选池、货币、保底和协议状态。
 
@@ -176,7 +175,7 @@ ceil(BaseCost(stage) * 1.32 ^ n)
 
 剩余概率进入普通随机选择。锚定检索跳过无效响应，并保证对指定目标产生发现或推进结果。
 
-阶段主协议（即 `CountsTowardStageCompletion` 为 `true`，不含附属协议）全部达到 `100` 后，后续机会执行深层解析。下一个科技点所需深层解析进度：
+阶段主协议（即 `CountsTowardStageCompletion` 为 `true`，不含附属协议）全部达到 `100` 后，广域检索机会执行深层解析。仍未完成的附属协议只接受方向或锚定检索；这些检索在已完成阶段保证有效，不执行无效响应，也不再奖励失败残片。下一个科技点所需深层解析进度：
 
 ```text
 NextPointCost = 2 + floor(TotalPointsEarned / 3)
@@ -286,8 +285,8 @@ RecipeKey = (ERecipe RecipeType, int InputId)
 - `Logic/Civilization/Technology/AncientTechTreeState.cs`
 - `Logic/Civilization/Technology/AncientTechTreeService.cs`
 - `Logic/Fractionation/Fractionators/TowerRuntimeModifierCache.cs`
-- `Logic/Fractionation/Fractionators/ConversionSingleLock.cs`
-- `Logic/Fractionation/Fractionators/AnalysisLineageTarget.cs`
+- `Logic/Fractionation/Fractionators/FractionatorMainOutputLock.cs`
+- `Logic/Fractionation/Fractionators/AnalysisLineageTarget.cs`（只读旧状态兼容）
 - `Logic/Fractionation/Fractionators/FractionatorByproductDiscard.cs`
 - `Logic/Fractionation/Process/ProcessManager.cs`
 
@@ -323,6 +322,8 @@ PrerequisiteNodeKey
 
 购买要求至少完成一个协议阶段，并且前置节点已解锁。同一塔型的所有实体塔共享节点状态。
 
+每项能力分别维护自己的授权与执行逻辑，但四塔必须都接入该项能力的同一入口。每塔状态可以分别为启用或未解锁；不得按塔型、配方类、主产物数量或副产物数量省略能力字段或 UI 行。当前配方无可用效果时显示对应的无目标/无副产物状态。
+
 能力语义：
 
 - `EnableFluidOutputStacking`：流动物品按塔当前堆叠上限整组输出。
@@ -350,7 +351,7 @@ AND 当前实体塔已保存对应设置
 5S
 ```
 
-交互塔通用孵化、转化塔多主产物和解析塔谱系分化分别保存实例目标。主路锁定只作用于 `OutputMain`；副产物弃置只作用于 `OutputAppend`。
+四塔统一使用 `LockedOutput` 保存主路目标。交互塔通用孵化、转化塔多主产物和解析塔谱系分化仍分别提供自己的候选集合与结算算法；资源塔等当前只有单一主产物的配方保留主路锁定状态和 UI，但显示当前无可选目标。主路锁定只作用于 `OutputMain`；副产物弃置只作用于 `OutputAppend`。
 
 批量结算只按实际产出成功数调用 `RecordSuccesses`。副产物批量补救按缺失成功次数和本批次已观察副产物命中率计算：
 
@@ -360,7 +361,7 @@ RollBinomialApprox(
     producedHits / rolledSuccessCount)
 ```
 
-三个实例状态通过 `FractionatorBlueprintParameters` 的共享 `Upsert/TryRead` 写入同一蓝图参数数组，互不覆盖；同时接入存档、复制粘贴和 Nebula packet type `2/3/4`。
+主路目标和副产物弃置通过 `FractionatorBlueprintParameters` 的共享 `Upsert/TryRead` 写入同一蓝图参数数组，互不覆盖；同时接入存档、复制粘贴和 Nebula packet type `2/4`。旧解析谱系蓝图参数和 packet type `3` 只作为兼容输入读取并迁入主路目标，新状态不再写出。
 
 ## 8. 成就与长期目标
 
@@ -431,13 +432,13 @@ Recovery
 
 定义目录不保存，只保存当前存档状态；导入后统一重建运行投影。首版试验使用的顶层 `Civilization` 块不注册读取，由通用未知块机制跳过；其中的协议、解析、科技点和成就不折算、不迁移，新结构从 `AncientCivilization` 空状态开始。旧 `Gacha`、`Economy`、`RecipeGrowth`、旧主面板页面和旧顶层文明恢复块同样不读取或导出。
 
-`BuildingManager` 保存配方累计成功和实例运行设置。解析谱系目标导入同时识别旧块名 `RectificationTuningTarget` 与当前块名 `AnalysisLineageTarget`，用于同一现役状态的名称兼容。
+`BuildingManager` 保存配方累计成功和实例运行设置。四塔主路目标统一写入 `LockedOutput`。导入仍识别旧解析谱系块名 `RectificationTuningTarget` 与 `AnalysisLineageTarget`，并将其中状态合并到通用主路目标；旧蓝图的谱系参数块同样作为兼容输入读取，新存档和新蓝图不再单独写出谱系目标。
 
 Nebula 文明同步采用主机权威模型：
 
 - 客户端动作请求包括手动解析数据上传、优先协议切换、单次/批量检索和科技购买。
 - 主机验证检索模式；网络批量请求上限为默认批量数 `10`。
-- 主机结算后使用 `CivilizationStatePacket` 广播阶段、协议、科技、成就、配方校准和残片/记忆源点余额。
+- 主机结算后使用 `CivilizationStatePacket` 广播阶段、协议、科技、成就、配方校准和残片余额。
 - 自动上传形成新检索机会、主机成就完成和玩家加入时，由主机广播或补发权威快照。
 - `CivilizationStatePacketProcessor` 在主机拒绝客户端全量快照。
 - 客户端请求分支返回等待主机状态，不提前修改本地文明状态。
@@ -450,7 +451,7 @@ Nebula 文明同步采用主机权威模型：
 - 旧定向原胚：`8016`。
 - 有明确现役对应物的隐藏科技和相关引用。
 
-迁移覆盖实体、预建筑、蓝图、库存与物流组件、传送带/分馏/分拣缓存、配方和科技引用。量子复制、点金、点数聚集和旧 I-V 原胚不映射。映射函数幂等。
+迁移覆盖实体、预建筑、蓝图、库存与物流组件、传送带/分馏/分拣缓存、配方和科技引用。量子复制、点金、点数聚集和旧 I-V 原胚不映射。映射函数幂等。3.0 首版使用过的记忆源点 ID `8168` 在导入时直接清空，不折算为残片或其他资源。
 
 `FractionatorOutputState.OutputExtendImport` 只保留 `LDB.items.Exist(outputId)` 的产物。数据中心旧 `LeftInc` 自动喷涂池块不再导出；导入旧存档时由未知标签长度机制完整跳过。下载物品只保留库存原有增产点。
 
@@ -462,7 +463,7 @@ Nebula 文明同步采用主机权威模型：
 
 - 不注册旧建筑等级、经验、突破、献祭、裂变池、共振、`SuccessBoost` 或自动喷涂池运行路径。
 - 不注册旧抽取、成长商店、市场交易、旧线性配方成长页面或存档块。
-- 不把残片、记忆源点和远古文明科技点加入互换入口。
+- 不把残片和远古文明科技点加入互换入口，也不重新注册记忆源点。
 - 不让 `MineralCopy` 创建临界光子、反物质或配方未明确列出的关键稀有产物；既定自然伴生副产物不属于该禁令。
 - 不让普通广域或方向检索绕过随机候选，也不让锚定检索返回无关或无效结果。
 - 不让批量检索采用与逐次单次不同的近似状态结算。

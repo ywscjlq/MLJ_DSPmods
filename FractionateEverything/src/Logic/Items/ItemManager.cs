@@ -18,13 +18,8 @@ public static class ItemManager {
     public static void AddTranslations() {
         Register("残片", "Archive Fragment", "残片");
         Register("I残片",
-            "Common archive currency recovered from damaged or invalid protocol data. It can narrow retrieval direction.",
-            "从损坏或无效协议数据中整理出的普通档案货币，可用于收窄检索方向。");
-        Register("记忆源点", "Memory Anchor", "记忆源点");
-        Register("I记忆源点",
-            "A high-integrity archive anchor used to locate and advance one eligible protocol precisely.",
-            "高完整度的文明档案锚点，可用于精确定位并推进一项符合阶段条件的协议。");
-
+            "Archive currency recovered from invalid protocol data. It pays for directional and anchored retrieval.",
+            "从无效协议数据中整理出的档案货币，用于支付方向检索和锚定检索。");
         RegisterAnalysisDataTranslations("电磁解析数据", "Electromagnetic Analysis Data", "电磁");
         RegisterAnalysisDataTranslations("能量解析数据", "Energy Analysis Data", "能量");
         RegisterAnalysisDataTranslations("结构解析数据", "Structure Analysis Data", "结构");
@@ -108,7 +103,6 @@ public static class ItemManager {
             new Color(0.1f, 0.7f, 1f), new Color(0.01f, 0.1f, 0.25f), "entropy-byproduct");
         RegisterRelicByproductItem(RelicItemIds.InfiniteCatalystByproduct, "催化余烬", "催化循环中产生的活性残留物", 303,
             new Color(1f, 0.85f, 0.3f), new Color(0.3f, 0.2f, 0.05f), "catalyst-byproduct");
-
         RegisterTowerProto(IFE交互塔原胚, "交互塔原胚", "I交互塔原胚", 201,
             "Assets/fe/frac-proto-normal", InteractionTower.color, "interaction-proto");
         RegisterTowerProto(IFE解析塔原胚, "解析塔原胚", "I解析塔原胚", 202,
@@ -485,10 +479,6 @@ public static class ItemManager {
 
     public static bool IsCivilizationResourceItem(int itemId) {
         return itemId == IFE残片 || IsAnalysisDataItem(itemId);
-    }
-
-    public static bool IsMemoryAnchorItem(int itemId) {
-        return itemId == IFE记忆源点;
     }
 
     public static int GetAnalysisDataLevel(int itemId) {
